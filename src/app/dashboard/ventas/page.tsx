@@ -124,16 +124,16 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Método de pago</label>
             <div className="grid grid-cols-4 gap-2">
-              {(Object.entries(MP_CFG) as [MetodoPago, typeof MP_CFG[MetodoPago]][]).map(([key, cfg]) => (
-                <button key={key} type="button" onClick={() => setMetodo(key)}
-                  className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
-                    metodo === key
-                      ? 'border-teal-500 bg-teal-50 text-teal-800'
-                      : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
-                  }`}>
-                  {cfg.label}
-                </button>
-              ))}
+                {(Object.keys(MP_CFG) as MetodoPago[]).map(key => (
+                  <button key={key} type="button" onClick={() => setMetodoPago(key)}
+                    className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
+                      metodo === key
+                        ? 'border-teal-500 bg-teal-50 text-teal-800'
+                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                    }`}>
+                    {MP_CFG[key].label}
+                  </button>
+                ))}
             </div>
           </div>
 
