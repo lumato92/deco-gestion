@@ -1,7 +1,6 @@
 'use client'
 
 // src/hooks/use-ventas.ts
-// Versión con realtime.
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -45,6 +44,7 @@ interface UseVentasReturn {
   ultimaActualizacion: Date | null
   setFiltros: (f: Partial<FiltrosVentas>) => void
   limpiarFiltros: () => void
+  recargar: () => void
 }
 
 export function useVentas(): UseVentasReturn {
@@ -53,6 +53,7 @@ export function useVentas(): UseVentasReturn {
   const [error, setError] = useState<string | null>(null)
   const [filtros, setFiltrosState] = useState<FiltrosVentas>(FILTROS_INICIALES)
   const [ultimaActualizacion, setUltimaActualizacion] = useState<Date | null>(null)
+  const [tick, setTick] = useState(0)
 
   const setFiltros = useCallback((f: Partial<FiltrosVentas>) => {
     setFiltrosState(prev => ({ ...prev, ...f }))
@@ -62,49 +63,52 @@ export function useVentas(): UseVentasReturn {
     setFiltrosState(FILTROS_INICIALES)
   }, [])
 
-  const fetchVentas = useCallback(async () => {
-    const supabase = createClient()
-    setLoading(true)
-    setError(null)
+  const recargar = useCallback(() => {
+    setTick(t => t + 1)
+  }, [])
 
-    try {
-      let query = supabase
-        .from('pedidos_con_total')
-        .select('*')
-        .order('fecha_pedido', { ascending: false })
-
-      if (filtros.estado) {
-        query = query.eq('estado', filtros.estado)
-      } else {
-        query = query.neq('estado', 'presupuesto')
-      }
-      if (filtros.metodo_pago)  query = query.eq('metodo_pago', filtros.metodo_pago)
-      if (filtros.canal_venta)  query = query.eq('canal_venta', filtros.canal_venta)
-      if (filtros.desde)        query = query.gte('fecha_confirmacion', filtros.desde)
-      if (filtros.hasta)        query = query.lte('fecha_confirmacion', filtros.hasta + 'T23:59:59')
-      if (filtros.busqueda)     query = query.ilike('cliente_nombre', `%${filtros.busqueda}%`)
-
-      const { data, error: err } = await query.limit(50)
-      if (err) throw err
-
-      setVentas(data ?? [])
-      setUltimaActualizacion(new Date())
-    } catch {
-      setError('Error al cargar las ventas')
-    } finally {
-      setLoading(false)
-    }
-  }, [filtros])
-
-  // Carga inicial y cuando cambian los filtros
   useEffect(() => {
-    fetchVentas()
-  }, [fetchVentas])
+    const supabase = createClient()
 
-  // Realtime — recarga cuando n8n u otro cliente modifica pedidos
+    async function fetchVentas() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        let query = supabase
+          .from('pedidos_con_total')
+          .select('*')
+          .order('fecha_pedido', { ascending: false })
+
+        if (filtros.estado) {
+          query = query.eq('estado', filtros.estado)
+        } else {
+          query = query.neq('estado', 'presupuesto')
+        }
+        if (filtros.metodo_pago)  query = query.eq('metodo_pago', filtros.metodo_pago)
+        if (filtros.canal_venta)  query = query.eq('canal_venta', filtros.canal_venta)
+        if (filtros.desde)        query = query.gte('fecha_confirmacion', filtros.desde)
+        if (filtros.hasta)        query = query.lte('fecha_confirmacion', filtros.hasta + 'T23:59:59')
+        if (filtros.busqueda)     query = query.ilike('cliente_nombre', `%${filtros.busqueda}%`)
+
+        const { data, error: err } = await query.limit(100)
+
+        if (err) throw err
+        setVentas(data ?? [])
+        setUltimaActualizacion(new Date())
+      } catch {
+        setError('Error al cargar las ventas')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchVentas()
+  }, [filtros, tick])
+
   useRealtime({
     tablas: ['pedidos', 'items_pedido', 'pagos_pedido'],
-    onCambio: fetchVentas,
+    onCambio: recargar,
   })
 
   const resumenMetodos: ResumenMetodos = {
@@ -117,16 +121,15 @@ export function useVentas(): UseVentasReturn {
   return {
     ventas,
     resumenMetodos,
-    totalPeriodo:   ventas.reduce((s, v) => s + v.total_cobrado, 0),
-    totalCobrado:   ventas.reduce((s, v) => s + v.cobrado, 0),
-    totalPendiente: ventas.reduce((s, v) => s + v.pendiente, 0),
+    totalPeriodo:    ventas.reduce((s, v) => s + v.total_cobrado, 0),
+    totalCobrado:    ventas.reduce((s, v) => s + v.cobrado, 0),
+    totalPendiente:  ventas.reduce((s, v) => s + v.pendiente, 0),
     loading,
     error,
     filtros,
     ultimaActualizacion,
     setFiltros,
     limpiarFiltros,
-    fetchVentas,
-    recargar
+    recargar,
   }
 }
