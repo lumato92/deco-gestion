@@ -1,0 +1,582 @@
+'use client'
+
+// src/app/dashboard/ventas/page.tsx
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { useVentas } from '@/hooks/use-ventas'
+import { createClient } from '@/lib/supabase/client'
+import { formatMonto, formatFecha } from '@/lib/utils'
+import type { EstadoPedido, MetodoPago, CanalVenta, PedidoConTotal } from '@/lib/types'
+
+// ── Config visual ─────────────────────────────────────────────
+
+const ESTADO_CFG: Record<EstadoPedido, { label: string; cls: string }> = {
+  presupuesto:    { label: 'Presupuesto',    cls: 'bg-blue-50 text-blue-800' },
+  confirmado:     { label: 'Confirmada',     cls: 'bg-teal-50 text-teal-800' },
+  reservado:      { label: 'Reservado',      cls: 'bg-purple-50 text-purple-800' },
+  en_fabricacion: { label: 'En fabricación', cls: 'bg-amber-50 text-amber-800' },
+  entregado:      { label: 'Entregada',      cls: 'bg-teal-50 text-teal-800' },
+  cancelado:      { label: 'Cancelada',      cls: 'bg-gray-100 text-gray-500' },
+}
+
+const MP_CFG: Record<MetodoPago, { label: string; cls: string }> = {
+  efectivo:      { label: 'Efectivo',      cls: 'bg-teal-50 text-teal-800' },
+  transferencia: { label: 'Transferencia', cls: 'bg-blue-50 text-blue-800' },
+  debito:        { label: 'Débito',        cls: 'bg-amber-50 text-amber-800' },
+  credito:       { label: 'Crédito',       cls: 'bg-pink-50 text-pink-800' },
+}
+
+function Badge({ text, cls }: { text: string; cls: string }) {
+  return <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>{text}</span>
+}
+
+// ── Modal cobrar ──────────────────────────────────────────────
+
+function ModalCobrar({ venta, onGuardar, onCerrar }: {
+  venta: PedidoConTotal
+  onGuardar: () => void
+  onCerrar: () => void
+}) {
+  const [monto, setMonto] = useState(venta.pendiente)
+  const [metodo, setMetodo] = useState<MetodoPago>(venta.metodo_pago ?? 'efectivo')
+  const [tipo, setTipo] = useState<'saldo' | 'adelanto'>('saldo')
+  const [notas, setNotas] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleGuardar = async () => {
+    if (monto <= 0) { setError('El monto debe ser mayor a 0'); return }
+    if (monto > venta.pendiente) { setError(`El máximo es ${formatMonto(venta.pendiente)}`); return }
+    setGuardando(true)
+    const supabase = createClient()
+
+    try {
+      // Registrar pago
+      const { error: errPago } = await supabase.from('pagos_pedido').insert({
+        pedido_id: venta.id,
+        tipo: monto >= venta.pendiente ? 'saldo' : tipo,
+        metodo_pago: metodo,
+        monto,
+        notas: notas.trim() || null,
+      })
+      if (errPago) throw new Error(errPago.message)
+
+      // Si se cobró todo, marcar como entregado
+      if (monto >= venta.pendiente && venta.estado !== 'entregado') {
+        await supabase
+          .from('pedidos')
+          .update({ estado: 'entregado' })
+          .eq('id', venta.id)
+      }
+
+      onGuardar()
+      onCerrar()
+    } catch (e: any) {
+      setError(e.message ?? 'Error al registrar el pago')
+      setGuardando(false)
+    }
+  }
+
+  const esSaldoTotal = monto >= venta.pendiente
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+        <div>
+          <h3 className="text-sm font-medium text-gray-900">Registrar cobro</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {venta.cliente_nombre ?? '(sin cliente)'} · Pedido #{venta.id}
+          </p>
+        </div>
+
+        {/* Resumen deuda */}
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 flex justify-between text-[12px]">
+          <span className="text-amber-800">Saldo pendiente</span>
+          <span className="font-medium text-amber-900">{formatMonto(venta.pendiente)}</span>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {/* Monto */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Monto a cobrar</label>
+              <button
+                onClick={() => setMonto(venta.pendiente)}
+                className="text-[11px] text-teal-600 hover:underline"
+              >
+                Cobrar todo
+              </button>
+            </div>
+            <input
+              type="number" min={0} max={venta.pendiente} value={monto || ''}
+              onChange={e => setMonto(Number(e.target.value))}
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400"
+            />
+            {esSaldoTotal && (
+              <p className="text-[11px] text-teal-600">
+                ✓ Cubre el saldo completo — la venta se marcará como entregada
+              </p>
+            )}
+          </div>
+
+          {/* Método de pago */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Método de pago</label>
+            <div className="grid grid-cols-4 gap-2">
+              {(Object.entries(MP_CFG) as [MetodoPago, typeof MP_CFG[MetodoPago]][]).map(([key, cfg]) => (
+                <button key={key} type="button" onClick={() => setMetodo(key)}
+                  className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
+                    metodo === key
+                      ? 'border-teal-500 bg-teal-50 text-teal-800'
+                      : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                  }`}>
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notas */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Notas (opcional)</label>
+            <input type="text" value={notas} onChange={e => setNotas(e.target.value)}
+              placeholder="Ej: Pago en cuotas, efectivo en mano..."
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+          </div>
+        </div>
+
+        {error && <p className="text-[11px] text-red-600">{error}</p>}
+
+        <div className="flex gap-2">
+          <button onClick={onCerrar}
+            className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button onClick={handleGuardar} disabled={guardando}
+            className="flex-1 py-2 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+            {guardando ? 'Guardando...' : `Registrar ${formatMonto(monto)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal editar venta ────────────────────────────────────────
+
+function ModalEditar({ venta, onGuardar, onCerrar }: {
+  venta: PedidoConTotal
+  onGuardar: () => void
+  onCerrar: () => void
+}) {
+  const [estado, setEstado] = useState<EstadoPedido>(venta.estado)
+  const [canal, setCanal] = useState<CanalVenta>(venta.canal_venta ?? 'directo')
+  const [metodo, setMetodo] = useState<MetodoPago>(venta.metodo_pago ?? 'efectivo')
+  const [notas, setNotas] = useState(venta.notas ?? '')
+  const [fechaEntrega, setFechaEntrega] = useState(venta.fecha_entrega ?? '')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleGuardar = async () => {
+    setGuardando(true)
+    const supabase = createClient()
+    const { error: err } = await supabase
+      .from('pedidos')
+      .update({
+        estado,
+        canal_venta: canal,
+        metodo_pago: metodo,
+        notas: notas.trim() || null,
+        fecha_entrega: fechaEntrega || null,
+        ...(estado === 'entregado' && !venta.fecha_entrega
+          ? { fecha_entrega: new Date().toISOString() }
+          : {}),
+      })
+      .eq('id', venta.id)
+
+    if (err) { setError(err.message); setGuardando(false); return }
+    onGuardar()
+    onCerrar()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+        <div>
+          <h3 className="text-sm font-medium text-gray-900">Editar venta #{venta.id}</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {venta.cliente_nombre ?? '(sin cliente)'} · {formatMonto(venta.total_cobrado)}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {/* Estado */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Estado</label>
+            <div className="flex flex-col gap-1.5">
+              {(Object.entries(ESTADO_CFG) as [EstadoPedido, typeof ESTADO_CFG[EstadoPedido]][])
+                .filter(([key]) => key !== 'presupuesto')
+                .map(([key, cfg]) => (
+                  <label key={key}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                      estado === key ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
+                    }`}>
+                    <input type="radio" name="estado" checked={estado === key}
+                      onChange={() => setEstado(key)} className="flex-shrink-0" />
+                    <Badge text={cfg.label} cls={cfg.cls} />
+                  </label>
+                ))
+              }
+            </div>
+          </div>
+
+          {/* Canal */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Canal de venta</label>
+            <select value={canal} onChange={e => setCanal(e.target.value as CanalVenta)}
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400">
+              <option value="directo">Directo</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="instagram">Instagram</option>
+              <option value="tienda">Tienda</option>
+            </select>
+          </div>
+
+          {/* Método de pago */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Método de pago</label>
+            <select value={metodo} onChange={e => setMetodo(e.target.value as MetodoPago)}
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="debito">Débito</option>
+              <option value="credito">Crédito</option>
+            </select>
+          </div>
+
+          {/* Fecha entrega */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Fecha de entrega</label>
+            <input type="date" value={fechaEntrega}
+              onChange={e => setFechaEntrega(e.target.value)}
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:border-teal-400" />
+          </div>
+
+          {/* Notas */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Notas</label>
+            <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
+              placeholder="Notas internas de la venta..."
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 resize-none" />
+          </div>
+        </div>
+
+        {error && <p className="text-[11px] text-red-600">{error}</p>}
+
+        <div className="flex gap-2">
+          <button onClick={onCerrar}
+            className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button onClick={handleGuardar} disabled={guardando}
+            className="flex-1 py-2 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+            {guardando ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Card método de pago ───────────────────────────────────────
+
+function MetodoCard({ label, monto, cant, pct, color, activo, onClick }: {
+  label: string; monto: number; cant: number; pct: number
+  color: string; activo: boolean; onClick: () => void
+}) {
+  return (
+    <button onClick={onClick}
+      className={`text-left p-3 rounded-lg border transition-colors ${
+        activo ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+      }`}>
+      <div className="text-[11px] text-gray-400 mb-1">{label}</div>
+      <div className="text-[15px] font-medium text-gray-900">{formatMonto(monto)}</div>
+      <div className="text-[11px] text-gray-400 mt-0.5">{cant} venta{cant !== 1 ? 's' : ''}</div>
+      <div className="h-1 mt-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </button>
+  )
+}
+
+// ── Página ────────────────────────────────────────────────────
+
+export default function VentasPage() {
+  const {
+    ventas, resumenMetodos, totalPeriodo, totalCobrado, totalPendiente,
+    loading, error, filtros, setFiltros, limpiarFiltros, recargar,fetchVentas
+  } = useVentas()
+
+  const [modalCobrar, setModalCobrar] = useState<PedidoConTotal | null>(null)
+  const [modalEditar, setModalEditar] = useState<PedidoConTotal | null>(null)
+
+  const maxMetodo = Math.max(
+    resumenMetodos.efectivo, resumenMetodos.transferencia,
+    resumenMetodos.debito, resumenMetodos.credito, 1
+  )
+
+  const metodos = [
+    { key: 'efectivo'      as MetodoPago, label: 'Efectivo',      color: 'bg-teal-500',  monto: resumenMetodos.efectivo },
+    { key: 'transferencia' as MetodoPago, label: 'Transferencia', color: 'bg-blue-500',  monto: resumenMetodos.transferencia },
+    { key: 'debito'        as MetodoPago, label: 'Débito +10%',   color: 'bg-amber-500', monto: resumenMetodos.debito },
+    { key: 'credito'       as MetodoPago, label: 'Crédito +20%',  color: 'bg-pink-500',  monto: resumenMetodos.credito },
+  ]
+
+  if (error) return (
+    <div className="p-5">
+      <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>
+    </div>
+  )
+
+  return (
+    <div className="p-5 flex flex-col gap-4">
+
+      {/* Modales */}
+      {modalCobrar && (
+        <ModalCobrar
+          venta={modalCobrar}
+          onGuardar={fetchVentas}
+          onCerrar={() => setModalCobrar(null)}
+        />
+      )}
+      {modalEditar && (
+        <ModalEditar
+          venta={modalEditar}
+          onGuardar={recargar}
+          onCerrar={() => setModalEditar(null)}
+        />
+      )}
+
+      {/* Topbar */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Ventas</p>
+          <h1 className="text-base font-medium text-gray-900">Todas las ventas</h1>
+        </div>
+        <div className="flex gap-2">
+          <button className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-600 hover:bg-gray-50">
+            Exportar CSV
+          </button>
+          <Link href="/dashboard/ventas/nueva"
+            className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+            + Nueva venta
+          </Link>
+        </div>
+      </div>
+
+      {/* Métricas */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { label: 'Total del período', valor: totalPeriodo,   sub: `${ventas.length} ventas` },
+          { label: 'Cobrado',           valor: totalCobrado,   sub: totalPeriodo > 0 ? `${Math.round(totalCobrado / totalPeriodo * 100)}% del total` : '—' },
+          { label: 'Por cobrar',        valor: totalPendiente, sub: `${ventas.filter(v => v.pendiente > 0).length} ventas con saldo` },
+          { label: 'Ticket promedio',   valor: ventas.length > 0 ? Math.round(totalPeriodo / ventas.length) : 0, sub: 'este período' },
+        ].map(m => (
+          <div key={m.label} className="bg-gray-100 rounded-lg px-4 py-3">
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">{m.label}</div>
+            {loading
+              ? <div className="h-6 w-20 bg-gray-200 rounded animate-pulse" />
+              : <div className="text-lg font-medium text-gray-900">{formatMonto(m.valor)}</div>
+            }
+            <div className="text-[11px] text-gray-400 mt-1">{m.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Cards método de pago */}
+      <div className="grid grid-cols-4 gap-3">
+        {metodos.map(m => {
+          const cant = ventas.filter(v => v.metodo_pago === m.key).length
+          return (
+            <MetodoCard
+              key={m.key}
+              label={m.label}
+              monto={m.monto}
+              cant={cant}
+              pct={Math.round(m.monto / maxMetodo * 100)}
+              color={m.color}
+              activo={filtros.metodo_pago === m.key}
+              onClick={() => setFiltros({
+                metodo_pago: filtros.metodo_pago === m.key ? '' : m.key
+              })}
+            />
+          )
+        })}
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+        <input type="text" placeholder="Buscar cliente..."
+          value={filtros.busqueda} onChange={e => setFiltros({ busqueda: e.target.value })}
+          className="flex-1 min-w-[160px] text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+        <div className="w-px h-5 bg-gray-200" />
+        <input type="date" value={filtros.desde} onChange={e => setFiltros({ desde: e.target.value })}
+          className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:border-teal-400" />
+        <span className="text-xs text-gray-400">→</span>
+        <input type="date" value={filtros.hasta} onChange={e => setFiltros({ hasta: e.target.value })}
+          className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:border-teal-400" />
+        <div className="w-px h-5 bg-gray-200" />
+        <select value={filtros.estado} onChange={e => setFiltros({ estado: e.target.value as EstadoPedido | '' })}
+          className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:border-teal-400">
+          <option value="">Todos los estados</option>
+          <option value="confirmado">Confirmadas</option>
+          <option value="reservado">Reservadas</option>
+          <option value="en_fabricacion">En fabricación</option>
+          <option value="entregado">Entregadas</option>
+          <option value="cancelado">Canceladas</option>
+        </select>
+        <select value={filtros.canal_venta} onChange={e => setFiltros({ canal_venta: e.target.value as CanalVenta | '' })}
+          className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:border-teal-400">
+          <option value="">Todos los canales</option>
+          <option value="directo">Directo</option>
+          <option value="whatsapp">WhatsApp</option>
+          <option value="instagram">Instagram</option>
+          <option value="tienda">Tienda</option>
+        </select>
+        <button onClick={limpiarFiltros}
+          className="ml-auto text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 border border-gray-200 rounded-lg bg-white">
+          Limpiar
+        </button>
+      </div>
+
+      {/* Tabs estado */}
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { val: '',               label: 'Todas' },
+          { val: 'confirmado',     label: 'Confirmadas' },
+          { val: 'reservado',      label: 'Reservadas' },
+          { val: 'en_fabricacion', label: 'En fabricación' },
+          { val: 'entregado',      label: 'Entregadas' },
+          { val: 'cancelado',      label: 'Canceladas' },
+        ].map(tab => {
+          const cnt = tab.val ? ventas.filter(v => v.estado === tab.val).length : ventas.length
+          return (
+            <button key={tab.val}
+              onClick={() => setFiltros({ estado: tab.val as EstadoPedido | '' })}
+              className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                filtros.estado === tab.val
+                  ? 'bg-teal-50 border-teal-500 text-teal-800'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}>
+              {tab.label} <span className="opacity-50">({cnt})</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tabla */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <span className="text-xs text-gray-400">
+            {loading ? 'Cargando...' : `${ventas.length} ventas`}
+          </span>
+          <select className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-600">
+            <option>Más recientes primero</option>
+            <option>Mayor monto</option>
+          </select>
+        </div>
+
+        <table className="w-full text-[12px]">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-100">
+              <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">#</th>
+              <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Fecha</th>
+              <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Cliente</th>
+              <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Canal</th>
+              <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Método de pago</th>
+              <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Estado</th>
+              <th className="text-right px-4 py-2 text-[11px] font-medium text-gray-400">Total</th>
+              <th className="text-right px-4 py-2 text-[11px] font-medium text-gray-400">Cobrado / Pendiente</th>
+              <th className="px-4 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="border-t border-gray-100">
+                    <td colSpan={9} className="px-4 py-3">
+                      <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4" />
+                    </td>
+                  </tr>
+                ))
+              : ventas.length === 0
+                ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-10 text-center text-xs text-gray-400">
+                      No hay ventas con los filtros seleccionados
+                    </td>
+                  </tr>
+                )
+                : ventas.map(v => {
+                    const estado = ESTADO_CFG[v.estado]
+                    const mp = v.metodo_pago ? MP_CFG[v.metodo_pago] : null
+                    return (
+                      <tr key={v.id} className="border-t border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-2.5 text-gray-400 text-[11px]">#{v.id}</td>
+                        <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">
+                          {v.fecha_confirmacion
+                            ? formatFecha(v.fecha_confirmacion)
+                            : formatFecha(v.fecha_pedido)}
+                        </td>
+                        <td className="px-4 py-2.5 font-medium text-gray-900">
+                          {v.cliente_nombre ?? <span className="text-gray-400 font-normal">(sin cliente)</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-500 capitalize">{v.canal_venta ?? '—'}</td>
+                        <td className="px-4 py-2.5">
+                          {mp ? <Badge text={mp.label} cls={mp.cls} /> : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <Badge text={estado.label} cls={estado.cls} />
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-medium text-gray-900">
+                          {formatMonto(v.total_cobrado)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          {v.pendiente > 0 ? (
+                            <div>
+                              <span className="text-gray-700">{formatMonto(v.cobrado)}</span>
+                              <span className="ml-1.5 text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
+                                -{formatMonto(v.pendiente)}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-700">{formatMonto(v.cobrado)}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex gap-1 justify-end">
+                            {v.pendiente > 0 && (
+                              <button
+                                onClick={() => setModalCobrar(v)}
+                                className="text-[11px] px-2.5 py-1 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
+                                Cobrar
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setModalEditar(v)}
+                              className="text-[11px] px-2 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+                              Editar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
