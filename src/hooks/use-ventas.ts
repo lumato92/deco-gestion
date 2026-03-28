@@ -127,5 +127,6 @@ export function useVentas(): UseVentasReturn {
     setFiltros,
     limpiarFiltros,
     fetchVentas,
+    recargar
   }
 }

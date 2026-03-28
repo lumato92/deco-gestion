@@ -9,8 +9,6 @@ import { createClient } from '@/lib/supabase/client'
 import { formatMonto, formatFecha } from '@/lib/utils'
 import type { EstadoPedido, MetodoPago, CanalVenta, PedidoConTotal } from '@/lib/types'
 
-// ── Config visual ─────────────────────────────────────────────
-
 const ESTADO_CFG: Record<EstadoPedido, { label: string; cls: string }> = {
   presupuesto:    { label: 'Presupuesto',    cls: 'bg-blue-50 text-blue-800' },
   confirmado:     { label: 'Confirmada',     cls: 'bg-teal-50 text-teal-800' },
@@ -40,7 +38,6 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
 }) {
   const [monto, setMonto] = useState(venta.pendiente)
   const [metodo, setMetodo] = useState<MetodoPago>(venta.metodo_pago ?? 'efectivo')
-  const [tipo, setTipo] = useState<'saldo' | 'adelanto'>('saldo')
   const [notas, setNotas] = useState('')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -50,24 +47,18 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
     if (monto > venta.pendiente) { setError(`El máximo es ${formatMonto(venta.pendiente)}`); return }
     setGuardando(true)
     const supabase = createClient()
-
     try {
-      // Registrar pago
       const { error: errPago } = await supabase.from('pagos_pedido').insert({
         pedido_id: venta.id,
-        tipo: monto >= venta.pendiente ? 'saldo' : tipo,
+        tipo: monto >= venta.pendiente ? 'saldo' : 'adelanto',
         metodo_pago: metodo,
         monto,
         notas: notas.trim() || null,
       })
       if (errPago) throw new Error(errPago.message)
 
-      // Si se cobró todo, marcar como entregado
       if (monto >= venta.pendiente && venta.estado !== 'entregado') {
-        await supabase
-          .from('pedidos')
-          .update({ estado: 'entregado' })
-          .eq('id', venta.id)
+        await supabase.from('pedidos').update({ estado: 'entregado' }).eq('id', venta.id)
       }
 
       onGuardar()
@@ -90,29 +81,23 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
           </p>
         </div>
 
-        {/* Resumen deuda */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 flex justify-between text-[12px]">
           <span className="text-amber-800">Saldo pendiente</span>
           <span className="font-medium text-amber-900">{formatMonto(venta.pendiente)}</span>
         </div>
 
         <div className="flex flex-col gap-3">
-          {/* Monto */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <label className="text-[11px] text-gray-500 uppercase tracking-wide">Monto a cobrar</label>
-              <button
-                onClick={() => setMonto(venta.pendiente)}
-                className="text-[11px] text-teal-600 hover:underline"
-              >
+              <button onClick={() => setMonto(venta.pendiente)}
+                className="text-[11px] text-teal-600 hover:underline">
                 Cobrar todo
               </button>
             </div>
-            <input
-              type="number" min={0} max={venta.pendiente} value={monto || ''}
+            <input type="number" min={0} max={venta.pendiente} value={monto || ''}
               onChange={e => setMonto(Number(e.target.value))}
-              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400"
-            />
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400" />
             {esSaldoTotal && (
               <p className="text-[11px] text-teal-600">
                 ✓ Cubre el saldo completo — la venta se marcará como entregada
@@ -120,24 +105,23 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
             )}
           </div>
 
-          {/* Método de pago */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Método de pago</label>
             <div className="grid grid-cols-4 gap-2">
-                {(Object.keys(MP_CFG) as MetodoPago[]).map(key => (
-                  <button key={key} type="button" onClick={() => setMetodoPago(key)}
-                    className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
-                      metodo === key
-                        ? 'border-teal-500 bg-teal-50 text-teal-800'
-                        : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
-                    }`}>
-                    {MP_CFG[key].label}
-                  </button>
-                ))}
+              {/* FIX: usar setMetodo (no setMetodoPago) y cast correcto */}
+              {(['efectivo', 'transferencia', 'debito', 'credito'] as MetodoPago[]).map(key => (
+                <button key={key} type="button" onClick={() => setMetodo(key)}
+                  className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
+                    metodo === key
+                      ? 'border-teal-500 bg-teal-50 text-teal-800'
+                      : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                  }`}>
+                  {MP_CFG[key].label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Notas */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Notas (opcional)</label>
             <input type="text" value={notas} onChange={e => setNotas(e.target.value)}
@@ -163,7 +147,7 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
   )
 }
 
-// ── Modal editar venta ────────────────────────────────────────
+// ── Modal editar ──────────────────────────────────────────────
 
 function ModalEditar({ venta, onGuardar, onCerrar }: {
   venta: PedidoConTotal
@@ -194,7 +178,6 @@ function ModalEditar({ venta, onGuardar, onCerrar }: {
           : {}),
       })
       .eq('id', venta.id)
-
     if (err) { setError(err.message); setGuardando(false); return }
     onGuardar()
     onCerrar()
@@ -211,27 +194,25 @@ function ModalEditar({ venta, onGuardar, onCerrar }: {
         </div>
 
         <div className="flex flex-col gap-3">
-          {/* Estado */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Estado</label>
             <div className="flex flex-col gap-1.5">
-              {(Object.entries(ESTADO_CFG) as [EstadoPedido, typeof ESTADO_CFG[EstadoPedido]][])
-                .filter(([key]) => key !== 'presupuesto')
-                .map(([key, cfg]) => (
+              {(Object.keys(ESTADO_CFG) as EstadoPedido[])
+                .filter(key => key !== 'presupuesto')
+                .map(key => (
                   <label key={key}
                     className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
                       estado === key ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'
                     }`}>
                     <input type="radio" name="estado" checked={estado === key}
                       onChange={() => setEstado(key)} className="flex-shrink-0" />
-                    <Badge text={cfg.label} cls={cfg.cls} />
+                    <Badge text={ESTADO_CFG[key].label} cls={ESTADO_CFG[key].cls} />
                   </label>
                 ))
               }
             </div>
           </div>
 
-          {/* Canal */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Canal de venta</label>
             <select value={canal} onChange={e => setCanal(e.target.value as CanalVenta)}
@@ -243,7 +224,6 @@ function ModalEditar({ venta, onGuardar, onCerrar }: {
             </select>
           </div>
 
-          {/* Método de pago */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Método de pago</label>
             <select value={metodo} onChange={e => setMetodo(e.target.value as MetodoPago)}
@@ -255,15 +235,12 @@ function ModalEditar({ venta, onGuardar, onCerrar }: {
             </select>
           </div>
 
-          {/* Fecha entrega */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Fecha de entrega</label>
-            <input type="date" value={fechaEntrega}
-              onChange={e => setFechaEntrega(e.target.value)}
+            <input type="date" value={fechaEntrega} onChange={e => setFechaEntrega(e.target.value)}
               className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:border-teal-400" />
           </div>
 
-          {/* Notas */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Notas</label>
             <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2}
@@ -313,9 +290,10 @@ function MetodoCard({ label, monto, cant, pct, color, activo, onClick }: {
 // ── Página ────────────────────────────────────────────────────
 
 export default function VentasPage() {
+  // FIX: sacar fetchVentas del destructuring — no existe en el hook
   const {
     ventas, resumenMetodos, totalPeriodo, totalCobrado, totalPendiente,
-    loading, error, filtros, setFiltros, limpiarFiltros, recargar,fetchVentas
+    loading, error, filtros, setFiltros, limpiarFiltros, recargar,
   } = useVentas()
 
   const [modalCobrar, setModalCobrar] = useState<PedidoConTotal | null>(null)
@@ -342,11 +320,10 @@ export default function VentasPage() {
   return (
     <div className="p-5 flex flex-col gap-4">
 
-      {/* Modales */}
       {modalCobrar && (
         <ModalCobrar
           venta={modalCobrar}
-          onGuardar={fetchVentas}
+          onGuardar={recargar}
           onCerrar={() => setModalCobrar(null)}
         />
       )}
@@ -557,14 +534,12 @@ export default function VentasPage() {
                         <td className="px-4 py-2.5">
                           <div className="flex gap-1 justify-end">
                             {v.pendiente > 0 && (
-                              <button
-                                onClick={() => setModalCobrar(v)}
+                              <button onClick={() => setModalCobrar(v)}
                                 className="text-[11px] px-2.5 py-1 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
                                 Cobrar
                               </button>
                             )}
-                            <button
-                              onClick={() => setModalEditar(v)}
+                            <button onClick={() => setModalEditar(v)}
                               className="text-[11px] px-2 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
                               Editar
                             </button>
