@@ -81,15 +81,19 @@ export function useVentas(): UseVentasReturn {
           .order('fecha_pedido', { ascending: false })
 
         if (filtros.estado) {
+          // Si el usuario eligió un estado específico (incluyendo cancelado), mostrarlo
           query = query.eq('estado', filtros.estado)
         } else {
-          query = query.neq('estado', 'presupuesto')
+          // Sin filtro: excluir presupuestos Y canceladas de la vista principal
+          // Las canceladas se pueden ver eligiendo el tab "Canceladas"
+          query = query.not('estado', 'in', '("presupuesto","cancelado")')
         }
-        if (filtros.metodo_pago)  query = query.eq('metodo_pago', filtros.metodo_pago)
-        if (filtros.canal_venta)  query = query.eq('canal_venta', filtros.canal_venta)
-        if (filtros.desde)        query = query.gte('fecha_confirmacion', filtros.desde)
-        if (filtros.hasta)        query = query.lte('fecha_confirmacion', filtros.hasta + 'T23:59:59')
-        if (filtros.busqueda)     query = query.ilike('cliente_nombre', `%${filtros.busqueda}%`)
+
+        if (filtros.metodo_pago) query = query.eq('metodo_pago', filtros.metodo_pago)
+        if (filtros.canal_venta) query = query.eq('canal_venta', filtros.canal_venta)
+        if (filtros.desde)       query = query.gte('fecha_confirmacion', filtros.desde)
+        if (filtros.hasta)       query = query.lte('fecha_confirmacion', filtros.hasta + 'T23:59:59')
+        if (filtros.busqueda)    query = query.ilike('cliente_nombre', `%${filtros.busqueda}%`)
 
         const { data, error: err } = await query.limit(100)
 
@@ -111,19 +115,23 @@ export function useVentas(): UseVentasReturn {
     onCambio: recargar,
   })
 
+  // Resumen por método — solo ventas activas (no canceladas)
+  const ventasActivas = ventas.filter(v => v.estado !== 'cancelado')
+
   const resumenMetodos: ResumenMetodos = {
-    efectivo:      ventas.filter(v => v.metodo_pago === 'efectivo').reduce((s, v) => s + v.total_cobrado, 0),
-    transferencia: ventas.filter(v => v.metodo_pago === 'transferencia').reduce((s, v) => s + v.total_cobrado, 0),
-    debito:        ventas.filter(v => v.metodo_pago === 'debito').reduce((s, v) => s + v.total_cobrado, 0),
-    credito:       ventas.filter(v => v.metodo_pago === 'credito').reduce((s, v) => s + v.total_cobrado, 0),
+    efectivo:      ventasActivas.filter(v => v.metodo_pago === 'efectivo').reduce((s, v) => s + v.total_cobrado, 0),
+    transferencia: ventasActivas.filter(v => v.metodo_pago === 'transferencia').reduce((s, v) => s + v.total_cobrado, 0),
+    debito:        ventasActivas.filter(v => v.metodo_pago === 'debito').reduce((s, v) => s + v.total_cobrado, 0),
+    credito:       ventasActivas.filter(v => v.metodo_pago === 'credito').reduce((s, v) => s + v.total_cobrado, 0),
   }
 
   return {
     ventas,
     resumenMetodos,
-    totalPeriodo:    ventas.reduce((s, v) => s + v.total_cobrado, 0),
-    totalCobrado:    ventas.reduce((s, v) => s + v.cobrado, 0),
-    totalPendiente:  ventas.reduce((s, v) => s + v.pendiente, 0),
+    // Totales calculados solo sobre ventas activas
+    totalPeriodo:   ventasActivas.reduce((s, v) => s + v.total_cobrado, 0),
+    totalCobrado:   ventasActivas.reduce((s, v) => s + v.cobrado, 0),
+    totalPendiente: ventasActivas.reduce((s, v) => s + v.pendiente, 0),
     loading,
     error,
     filtros,
