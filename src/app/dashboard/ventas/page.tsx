@@ -7,7 +7,10 @@ import Link from 'next/link'
 import { useVentas } from '@/hooks/use-ventas'
 import { createClient } from '@/lib/supabase/client'
 import { formatMonto, formatFecha } from '@/lib/utils'
+import { ModalAccionesVenta } from '@/components/ventas/modal-acciones'
 import type { EstadoPedido, MetodoPago, CanalVenta, PedidoConTotal } from '@/lib/types'
+
+// ── Config visual ─────────────────────────────────────────────
 
 const ESTADO_CFG: Record<EstadoPedido, { label: string; cls: string }> = {
   presupuesto:    { label: 'Presupuesto',    cls: 'bg-blue-50 text-blue-800' },
@@ -26,7 +29,11 @@ const MP_CFG: Record<MetodoPago, { label: string; cls: string }> = {
 }
 
 function Badge({ text, cls }: { text: string; cls: string }) {
-  return <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>{text}</span>
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>
+      {text}
+    </span>
+  )
 }
 
 // ── Modal cobrar ──────────────────────────────────────────────
@@ -56,11 +63,9 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
         notas: notas.trim() || null,
       })
       if (errPago) throw new Error(errPago.message)
-
       if (monto >= venta.pendiente && venta.estado !== 'entregado') {
         await supabase.from('pedidos').update({ estado: 'entregado' }).eq('id', venta.id)
       }
-
       onGuardar()
       onCerrar()
     } catch (e: any) {
@@ -68,8 +73,6 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
       setGuardando(false)
     }
   }
-
-  const esSaldoTotal = monto >= venta.pendiente
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -98,7 +101,7 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
             <input type="number" min={0} max={venta.pendiente} value={monto || ''}
               onChange={e => setMonto(Number(e.target.value))}
               className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400" />
-            {esSaldoTotal && (
+            {monto >= venta.pendiente && (
               <p className="text-[11px] text-teal-600">
                 ✓ Cubre el saldo completo — la venta se marcará como entregada
               </p>
@@ -108,7 +111,6 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Método de pago</label>
             <div className="grid grid-cols-4 gap-2">
-              {/* FIX: usar setMetodo (no setMetodoPago) y cast correcto */}
               {(['efectivo', 'transferencia', 'debito', 'credito'] as MetodoPago[]).map(key => (
                 <button key={key} type="button" onClick={() => setMetodo(key)}
                   className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
@@ -125,7 +127,7 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Notas (opcional)</label>
             <input type="text" value={notas} onChange={e => setNotas(e.target.value)}
-              placeholder="Ej: Pago en cuotas, efectivo en mano..."
+              placeholder="Ej: Pago en efectivo en mano..."
               className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
           </div>
         </div>
@@ -290,7 +292,6 @@ function MetodoCard({ label, monto, cant, pct, color, activo, onClick }: {
 // ── Página ────────────────────────────────────────────────────
 
 export default function VentasPage() {
-  // FIX: sacar fetchVentas del destructuring — no existe en el hook
   const {
     ventas, resumenMetodos, totalPeriodo, totalCobrado, totalPendiente,
     loading, error, filtros, setFiltros, limpiarFiltros, recargar,
@@ -298,6 +299,7 @@ export default function VentasPage() {
 
   const [modalCobrar, setModalCobrar] = useState<PedidoConTotal | null>(null)
   const [modalEditar, setModalEditar] = useState<PedidoConTotal | null>(null)
+  const [modalAcciones, setModalAcciones] = useState<PedidoConTotal | null>(null)
 
   const maxMetodo = Math.max(
     resumenMetodos.efectivo, resumenMetodos.transferencia,
@@ -320,6 +322,7 @@ export default function VentasPage() {
   return (
     <div className="p-5 flex flex-col gap-4">
 
+      {/* Modales */}
       {modalCobrar && (
         <ModalCobrar
           venta={modalCobrar}
@@ -332,6 +335,13 @@ export default function VentasPage() {
           venta={modalEditar}
           onGuardar={recargar}
           onCerrar={() => setModalEditar(null)}
+        />
+      )}
+      {modalAcciones && (
+        <ModalAccionesVenta
+          venta={modalAcciones}
+          onCompletado={recargar}
+          onCerrar={() => setModalAcciones(null)}
         />
       )}
 
@@ -471,7 +481,7 @@ export default function VentasPage() {
               <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Fecha</th>
               <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Cliente</th>
               <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Canal</th>
-              <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Método de pago</th>
+              <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Método</th>
               <th className="text-left px-4 py-2 text-[11px] font-medium text-gray-400">Estado</th>
               <th className="text-right px-4 py-2 text-[11px] font-medium text-gray-400">Total</th>
               <th className="text-right px-4 py-2 text-[11px] font-medium text-gray-400">Cobrado / Pendiente</th>
@@ -542,6 +552,11 @@ export default function VentasPage() {
                             <button onClick={() => setModalEditar(v)}
                               className="text-[11px] px-2 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
                               Editar
+                            </button>
+                            <button onClick={() => setModalAcciones(v)}
+                              className="text-[11px] px-2 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"
+                              title="Devolución, cambio o eliminar">
+                              ···
                             </button>
                           </div>
                         </td>
