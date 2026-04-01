@@ -1,84 +1,147 @@
 'use client'
 
+// src/components/layout/sidebar.tsx
+// Con usuario logueado, botón de logout y sección de usuarios para root
+
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import {
-  LayoutGrid, Plus, List, FileText,
-  Package, Layers, Users, TrendingUp, DollarSign
-} from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 function cn(...classes: (string | boolean | undefined)[]) {
   return classes.filter(Boolean).join(' ')
 }
 
-const nav = [
-  {
-    section: 'Ventas',
-    items: [
-      { href: '/dashboard/ventas/nueva',        label: 'Nueva venta',      icon: Plus },
-      { href: '/dashboard/ventas',              label: 'Todas las ventas', icon: List },
-      { href: '/dashboard/ventas/presupuestos', label: 'Presupuestos',     icon: FileText },
-    ],
-  },
-  {
-    section: 'Catálogo',
-    items: [
-      { href: '/dashboard/productos', label: 'Productos', icon: Package },
-      { href: '/dashboard/insumos',   label: 'Insumos',   icon: Layers },
-    ],
-  },
-  {
-    section: 'Negocio',
-    items: [
-      { href: '/dashboard/clientes', label: 'Clientes', icon: Users },
-      { href: '/dashboard/finanzas', label: 'Finanzas', icon: TrendingUp },
-      { href: '/dashboard/gastos',   label: 'Gastos',   icon: DollarSign },
-    ],
-  },
-]
+interface UsuarioSesion {
+  id: string
+  username: string
+  nombre: string
+  rol: 'root' | 'admin' | 'user'
+}
+
+const ROL_BADGE = {
+  root:  'bg-purple-100 text-purple-700',
+  admin: 'bg-blue-100 text-blue-700',
+  user:  'bg-gray-100 text-gray-500',
+}
 
 export default function Sidebar() {
   const path = usePathname()
+  const router = useRouter()
+  const [usuario, setUsuario] = useState<UsuarioSesion | null>(null)
+  const [cerrando, setCerrando] = useState(false)
+
+  useEffect(() => {
+    // Obtener sesión desde la API
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(data => { if (data.usuario) setUsuario(data.usuario) })
+      .catch(() => {})
+  }, [])
+
+  const handleLogout = async () => {
+    setCerrando(true)
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+    router.refresh()
+  }
+
+  const esAdmin = usuario?.rol === 'root' || usuario?.rol === 'admin'
+
+  // Navegación según rol
+  const nav = [
+    {
+      section: 'Ventas',
+      items: [
+        { href: '/dashboard/ventas/nueva',        label: 'Nueva venta',     show: true },
+        { href: '/dashboard/ventas',              label: 'Todas las ventas', show: true },
+        { href: '/dashboard/ventas/presupuestos', label: 'Presupuestos',    show: true },
+      ],
+    },
+    {
+      section: 'Catálogo',
+      items: [
+        { href: '/dashboard/productos', label: 'Productos', show: true },
+        { href: '/dashboard/insumos',   label: 'Insumos',   show: esAdmin },
+      ],
+    },
+    {
+      section: 'Negocio',
+      items: [
+        { href: '/dashboard/clientes',  label: 'Clientes',  show: true },
+        { href: '/dashboard/finanzas',  label: 'Finanzas',  show: esAdmin },
+        { href: '/dashboard/gastos',    label: 'Gastos',    show: esAdmin },
+        { href: '/dashboard/proveedores', label: 'Proveedores', show: esAdmin },
+      ],
+    },
+    ...(usuario?.rol === 'root' ? [{
+      section: 'Administración',
+      items: [
+        { href: '/dashboard/usuarios', label: 'Usuarios', show: true },
+      ],
+    }] : []),
+  ]
 
   return (
     <aside className="w-[200px] border-r border-gray-200 bg-gray-50 flex flex-col flex-shrink-0">
+
+      {/* Logo */}
       <div className="px-4 py-4 border-b border-gray-200">
         <span className="text-sm font-medium text-gray-900">Deco gestión</span>
         <span className="block text-xs text-gray-400 mt-0.5">Panel de administración</span>
       </div>
 
-      <Link
-        href="/dashboard"
+      {/* Dashboard */}
+      <Link href="/dashboard"
         className={cn(
           'flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:bg-white hover:text-gray-900',
           path === '/dashboard' && 'bg-white text-gray-900 font-medium border-l-2 border-teal-600'
-        )}
-      >
-        <LayoutGrid size={14} className="opacity-60" />
-        Dashboard
+        )}>
+        ⌂ Dashboard
       </Link>
 
+      {/* Nav por sección */}
       {nav.map(({ section, items }) => (
         <div key={section}>
           <div className="px-4 py-2 mt-2 text-[10px] text-gray-400 uppercase tracking-widest">
             {section}
           </div>
-          {items.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
+          {items.filter(i => i.show).map(({ href, label }) => (
+            <Link key={href} href={href}
               className={cn(
                 'flex items-center gap-2 pl-8 pr-4 py-2 text-xs text-gray-500 hover:bg-white hover:text-gray-900',
-                path.startsWith(href) && href !== '/ventas' && 'bg-white text-gray-900 font-medium border-l-2 border-teal-600',
-                path === href && 'bg-white text-gray-900 font-medium border-l-2 border-teal-600'
-              )}
-            >
-              <Icon size={14} className="opacity-60 flex-shrink-0" />
+                path.startsWith(href) && 'bg-white text-gray-900 font-medium border-l-2 border-teal-600'
+              )}>
               {label}
             </Link>
           ))}
         </div>
       ))}
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Usuario logueado */}
+      {usuario && (
+        <div className="border-t border-gray-200 p-3">
+          <div className="flex items-center gap-2.5 mb-2">
+            <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center text-[10px] font-medium text-teal-800 flex-shrink-0">
+              {usuario.nombre.slice(0, 2).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[12px] font-medium text-gray-900 truncate">{usuario.nombre}</div>
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${ROL_BADGE[usuario.rol]}`}>
+                {usuario.rol}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            disabled={cerrando}
+            className="w-full text-left text-[11px] text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded hover:bg-gray-100 transition-colors disabled:opacity-50">
+            {cerrando ? 'Cerrando...' : '← Cerrar sesión'}
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

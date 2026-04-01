@@ -2,10 +2,11 @@
 
 // src/app/dashboard/productos/page.tsx
 
-import { useState } from 'react'
 import Link from 'next/link'
 import { useProductos } from '@/hooks/use-productos'
+import { createClient } from '@/lib/supabase/client'
 import { formatMonto } from '@/lib/utils'
+import { useState, useEffect } from 'react'
 
 function normalizar(str: string) {
   return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -32,11 +33,240 @@ function MargenColor({ pct }: { pct: number }) {
   return <span className={`font-medium ${cls}`}>{pct}%</span>
 }
 
-export default function ProductosPage() {
-  const { productos, todos, stats, loading, error, filtros, setFiltros, limpiarFiltros } = useProductos()
-  const [vista, setVista] = useState<'lista' | 'grilla'>('lista')
+// ── Modal fabricar ────────────────────────────────────────────
 
-  // Categorías únicas para el filtro
+interface RecetaItem {
+  insumo_id: number
+  insumo_nombre: string
+  cantidad_unit: number
+  unidad: string
+  stock_disponible: number
+  costo_unit: number
+}
+
+// Reemplazar SOLO la función ModalFabricar en productos/page.tsx
+// Todo lo demás queda igual
+
+function ModalFabricar({ producto, onCompletado, onCerrar }: {
+  producto: { id: number; nombre: string; stock: number }
+  onCompletado: () => void
+  onCerrar: () => void
+}) {
+  const [cantidad, setCantidad] = useState(1)
+  const [fabricando, setFabricando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [erroresInsumos, setErroresInsumos] = useState<any[]>([])
+  const [receta, setReceta] = useState<any[]>([])
+  const [loadingReceta, setLoadingReceta] = useState(true)
+
+  // useEffect correcto para cargar receta con stock REAL de insumos
+  useEffect(() => {
+    const supabase = createClient()
+
+    const cargar = async () => {
+      // Traer receta joinada con stock actual de insumos directamente
+      const { data: recetaData } = await supabase
+        .from('recetas')
+        .select(`
+          cantidad,
+          insumos (
+            id,
+            nombre,
+            unidad,
+            stock,
+            costo
+          )
+        `)
+        .eq('producto_id', producto.id)
+
+      if (recetaData) {
+        setReceta(recetaData.map((r: any) => ({
+          insumo_id: r.insumos.id,
+          insumo_nombre: r.insumos.nombre,
+          cantidad_unit: r.cantidad,
+          unidad: r.insumos.unidad,
+          stock_disponible: r.insumos.stock,  // stock real y actualizado
+          costo_unit: r.insumos.costo,
+        })))
+      }
+      setLoadingReceta(false)
+    }
+
+    cargar()
+  }, [producto.id])
+
+  // Calcular si hay stock suficiente para la cantidad pedida
+  const insuficientes = receta.filter(r => r.stock_disponible < r.cantidad_unit * cantidad)
+
+  const handleFabricar = async () => {
+    if (cantidad <= 0) { setError('La cantidad debe ser mayor a 0'); return }
+    setFabricando(true)
+    setError(null)
+    setErroresInsumos([])
+
+    const supabase = createClient()
+    const { data, error: err } = await supabase.rpc('fabricar', {
+      p_producto_id: producto.id,
+      p_cantidad: cantidad,
+    })
+
+    if (err) {
+      setError(err.message)
+      setFabricando(false)
+      return
+    }
+
+    if (!data?.ok) {
+      setErroresInsumos(data?.errores ?? [])
+      setFabricando(false)
+      return
+    }
+
+    onCompletado()
+    onCerrar()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl border border-gray-200 w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden">
+
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-medium text-gray-900">Fabricar producto</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {producto.nombre} · Stock actual: {producto.stock} u.
+          </p>
+        </div>
+
+        <div className="overflow-y-auto flex-1 p-5 flex flex-col gap-4">
+
+          {/* Cantidad */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">
+              Cantidad a fabricar
+            </label>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setCantidad(q => Math.max(1, q - 1))}
+                className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-lg font-medium">
+                −
+              </button>
+              <input
+                type="number" min={1} value={cantidad}
+                onChange={e => setCantidad(Math.max(1, Number(e.target.value)))}
+                className="w-20 text-center text-[16px] font-medium text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400"
+              />
+              <button
+                onClick={() => setCantidad(q => q + 1)}
+                className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-lg font-medium">
+                +
+              </button>
+              <span className="text-[12px] text-gray-400">unidades</span>
+            </div>
+          </div>
+
+          {/* Receta con stock real */}
+          <div>
+            <div className="text-[11px] text-gray-500 uppercase tracking-wide mb-2">
+              Insumos necesarios para {cantidad} u.
+            </div>
+
+            {loadingReceta ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : receta.length === 0 ? (
+              <div className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+                ⚠️ Este producto no tiene receta cargada. Agregá los insumos desde Editar producto.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1 bg-gray-50 rounded-xl p-3">
+                {receta.map(r => {
+                  const necesario = r.cantidad_unit * cantidad
+                  const suficiente = r.stock_disponible >= necesario
+                  const falta = necesario - r.stock_disponible
+                  return (
+                    <div key={r.insumo_id}
+                      className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                      <div className="flex-1">
+                        <div className="text-[12px] font-medium text-gray-900">{r.insumo_nombre}</div>
+                        <div className="text-[11px] text-gray-400 mt-0.5">
+                          Necesita <span className="font-medium text-gray-700">{necesario} {r.unidad}</span>
+                          {' '}· Stock: <span className={`font-medium ${suficiente ? 'text-teal-700' : 'text-red-600'}`}>
+                            {r.stock_disponible} {r.unidad}
+                          </span>
+                        </div>
+                      </div>
+                      <div className={`text-[11px] font-medium px-2 py-0.5 rounded-full ml-3 flex-shrink-0 ${
+                        suficiente ? 'bg-teal-50 text-teal-700' : 'bg-red-50 text-red-700'
+                      }`}>
+                        {suficiente ? '✓ OK' : `Faltan ${falta % 1 === 0 ? falta : falta.toFixed(2)}`}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Errores de Supabase */}
+          {erroresInsumos.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="text-[12px] font-medium text-red-800 mb-2">
+                Stock insuficiente:
+              </div>
+              {erroresInsumos.map((e: any, i: number) => (
+                <div key={i} className="text-[11px] text-red-700 py-1.5 border-b border-red-100 last:border-0">
+                  <span className="font-medium">{e.insumo}</span>
+                  {' '}— necesita {e.necesario}, tiene {e.disponible}
+                  {e.es_fabricable && (
+                    <div className="text-red-500 mt-0.5">
+                      💡 Fabricable — fabricalo primero desde Insumos
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Advertencia preventiva */}
+          {insuficientes.length > 0 && erroresInsumos.length === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-[11px] text-amber-800">
+              ⚠️ Stock insuficiente para {cantidad} unidades. Reducí la cantidad o reabastecé los insumos en rojo.
+            </div>
+          )}
+
+          {error && (
+            <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
+          <button onClick={onCerrar}
+            className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button
+            onClick={handleFabricar}
+            disabled={fabricando || receta.length === 0 || insuficientes.length > 0}
+            className="flex-1 py-2 text-xs font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            {fabricando ? 'Fabricando...' : `Fabricar ${cantidad} u.`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+// ── Página ────────────────────────────────────────────────────
+
+export default function ProductosPage() {
+  const { productos, todos, stats, loading, error, filtros, setFiltros, limpiarFiltros, recargar } = useProductos()
+  const [vista, setVista] = useState<'lista' | 'grilla'>('lista')
+  const [modalFabricar, setModalFabricar] = useState<{ id: number; nombre: string; stock: number } | null>(null)
+
   const categorias = Array.from(
     new Map(todos.filter(p => p.categoria_id && p.categoria_nombre)
       .map(p => [p.categoria_id, { id: p.categoria_id!, nombre: p.categoria_nombre! }]))
@@ -52,6 +282,14 @@ export default function ProductosPage() {
   return (
     <div className="p-5 flex flex-col gap-4">
 
+      {modalFabricar && (
+        <ModalFabricar
+          producto={modalFabricar}
+          onCompletado={() => { recargar(); setModalFabricar(null) }}
+          onCerrar={() => setModalFabricar(null)}
+        />
+      )}
+
       {/* Topbar */}
       <div className="flex items-center justify-between">
         <div>
@@ -59,7 +297,6 @@ export default function ProductosPage() {
           <h1 className="text-base font-medium text-gray-900">Productos</h1>
         </div>
         <div className="flex gap-2 items-center">
-          {/* Toggle vista */}
           <div className="flex border border-gray-200 rounded-lg overflow-hidden">
             <button onClick={() => setVista('lista')}
               className={`px-2.5 py-1.5 ${vista === 'lista' ? 'bg-gray-100' : 'hover:bg-gray-50'}`} title="Vista lista">
@@ -85,9 +322,9 @@ export default function ProductosPage() {
       {/* Métricas */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Total productos', valor: stats.total, sub: 'en catálogo', fmt: false },
-          { label: 'Valor en stock',  valor: stats.valorStock, sub: 'al costo', fmt: true },
-          { label: 'Stock bajo',      valor: stats.stockBajo, sub: 'requieren reposición', fmt: false },
+          { label: 'Total productos', valor: stats.total,      sub: 'en catálogo',           fmt: false },
+          { label: 'Valor en stock',  valor: stats.valorStock, sub: 'al costo',               fmt: true },
+          { label: 'Stock bajo',      valor: stats.stockBajo,  sub: 'requieren reposición',   fmt: false },
           { label: 'Sin publicar',    valor: stats.sinPublicar, sub: 'no visibles en tienda', fmt: false },
         ].map(m => (
           <div key={m.label} className="bg-gray-100 rounded-lg px-4 py-3">
@@ -131,9 +368,9 @@ export default function ProductosPage() {
           className="flex-1 min-w-[160px] text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
         <div className="w-px h-5 bg-gray-200" />
         {[
-          { key: 'tipo', label: 'Tipo', opts: [['', 'Todo tipo'], ['propio', 'Propio'], ['reventa', 'Reventa'], ['consignacion', 'Consignación']] },
-          { key: 'estado_stock', label: 'Stock', opts: [['', 'Todo stock'], ['bajo', 'Bajo'], ['medio', 'Medio'], ['ok', 'OK']] },
-          { key: 'publicado', label: 'Visibilidad', opts: [['', 'Todos'], ['true', 'Publicados'], ['false', 'No publicados']] },
+          { key: 'tipo',         opts: [['', 'Todo tipo'], ['propio', 'Propio'], ['reventa', 'Reventa'], ['consignacion', 'Consignación']] },
+          { key: 'estado_stock', opts: [['', 'Todo stock'], ['bajo', 'Bajo'], ['medio', 'Medio'], ['ok', 'OK']] },
+          { key: 'publicado',    opts: [['', 'Todos'], ['true', 'Publicados'], ['false', 'No publicados']] },
         ].map(f => (
           <select key={f.key} value={(filtros as any)[f.key]}
             onChange={e => setFiltros({ [f.key]: e.target.value } as any)}
@@ -154,11 +391,6 @@ export default function ProductosPage() {
             <span className="text-xs text-gray-400">
               {loading ? 'Cargando...' : `${productos.length} productos`}
             </span>
-            <select className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-600">
-              <option>Nombre A→Z</option>
-              <option>Mayor margen</option>
-              <option>Menor stock</option>
-            </select>
           </div>
           <table className="w-full text-[12px]">
             <thead>
@@ -233,6 +465,14 @@ export default function ProductosPage() {
                           </td>
                           <td className="px-4 py-2.5">
                             <div className="flex gap-1 justify-end">
+                              {/* Botón fabricar — solo para productos propios con receta */}
+                              {p.tipo === 'propio' && (
+                                <button
+                                  onClick={() => setModalFabricar({ id: p.id, nombre: p.nombre, stock: p.stock })}
+                                  className="text-[11px] px-2.5 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium">
+                                  Fabricar
+                                </button>
+                              )}
                               <Link href={`/dashboard/productos/${p.id}/editar`}
                                 className="text-[11px] border border-gray-200 rounded px-2 py-1 text-gray-500 hover:bg-gray-50">
                                 Editar
@@ -282,10 +522,16 @@ export default function ProductosPage() {
                         <MargenColor pct={p.margen_pct ?? 0} />
                       </div>
                     </div>
-                    <div className="px-3 pb-3 pt-0 flex justify-between items-center border-t border-gray-100 mt-2 pt-2">
-                      <span className="text-[11px] text-gray-400">{p.categoria_nombre}</span>
+                    <div className="px-3 pb-3 flex gap-1 border-t border-gray-100 pt-2">
+                      {p.tipo === 'propio' && (
+                        <button
+                          onClick={() => setModalFabricar({ id: p.id, nombre: p.nombre, stock: p.stock })}
+                          className="flex-1 text-[11px] py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium">
+                          Fabricar
+                        </button>
+                      )}
                       <Link href={`/dashboard/productos/${p.id}/editar`}
-                        className="text-[11px] border border-gray-200 rounded px-2 py-1 text-gray-500 hover:bg-gray-50">
+                        className="flex-1 text-[11px] py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 text-center">
                         Editar
                       </Link>
                     </div>

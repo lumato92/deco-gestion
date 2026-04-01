@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { useInsumos, type Insumo } from '@/hooks/use-insumos'
+import { createClient } from '@/lib/supabase/client'
 import { formatMonto } from '@/lib/utils'
 
 function normalizar(str: string) {
@@ -15,6 +16,13 @@ const STOCK_CFG = {
   medio: { label: 'Medio', cls: 'bg-amber-50 text-amber-800', dot: 'bg-amber-400' },
   bajo:  { label: 'Bajo',  cls: 'bg-red-50 text-red-800',     dot: 'bg-red-400' },
 } as const
+
+interface Proveedor {
+  id: number
+  nombre: string
+  telefono?: string
+  tipo?: string
+}
 
 // ── Input de categoría con autocomplete ───────────────────────
 
@@ -34,8 +42,7 @@ function InputCategoria({ value, onChange, categorias }: {
   return (
     <div className="relative">
       <input
-        type="text"
-        value={value}
+        type="text" value={value}
         onChange={e => { onChange(e.target.value); setAbierto(true) }}
         onFocus={() => setAbierto(true)}
         onBlur={() => setTimeout(() => setAbierto(false), 150)}
@@ -45,16 +52,180 @@ function InputCategoria({ value, onChange, categorias }: {
       {abierto && sugerencias.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-20 overflow-hidden shadow-sm">
           {sugerencias.map(c => (
-            <button
-              key={c}
-              onMouseDown={() => { onChange(c); setAbierto(false) }}
-              className="w-full text-left px-3 py-2 text-[12px] text-gray-900 hover:bg-gray-50 border-b border-gray-100 last:border-0"
-            >
+            <button key={c} onMouseDown={() => { onChange(c); setAbierto(false) }}
+              className="w-full text-left px-3 py-2 text-[12px] text-gray-900 hover:bg-gray-50 border-b border-gray-100 last:border-0">
               {c}
             </button>
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Selector de proveedor ─────────────────────────────────────
+
+function SelectorProveedor({ value, onChange, onNuevo }: {
+  value: { id: number; nombre: string } | null
+  onChange: (p: { id: number; nombre: string } | null) => void
+  onNuevo: () => void
+}) {
+  const [busqueda, setBusqueda] = useState('')
+  const [todos, setTodos] = useState<Proveedor[]>([])
+  const [resultados, setResultados] = useState<Proveedor[]>([])
+  const [abierto, setAbierto] = useState(false)
+
+  useEffect(() => {
+    createClient()
+      .from('proveedores')
+      .select('id, nombre, telefono, tipo')
+      .eq('activo', true)
+      .order('nombre')
+      .then(({ data }) => setTodos(data ?? []))
+  }, [])
+
+  useEffect(() => {
+    if (busqueda.length < 1) { setResultados(todos.slice(0, 6)); return }
+    const q = normalizar(busqueda)
+    setResultados(todos.filter(p =>
+      normalizar(p.nombre).includes(q) || normalizar(p.tipo ?? '').includes(q)
+    ).slice(0, 6))
+  }, [busqueda, todos])
+
+  if (value) {
+    return (
+      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+        <div className="flex-1">
+          <div className="text-[13px] font-medium text-gray-900">{value.nombre}</div>
+        </div>
+        <button onClick={() => onChange(null)}
+          className="text-[11px] text-gray-400 hover:text-gray-600">
+          Cambiar
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="relative">
+        <input
+          type="text" value={busqueda}
+          onChange={e => { setBusqueda(e.target.value); setAbierto(true) }}
+          onFocus={() => { setAbierto(true); setResultados(todos.slice(0, 6)) }}
+          onBlur={() => setTimeout(() => setAbierto(false), 150)}
+          placeholder="Buscar proveedor..."
+          className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
+        />
+        {abierto && resultados.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-20 overflow-hidden shadow-sm">
+            {resultados.map(p => (
+              <button key={p.id}
+                onMouseDown={() => {
+                  onChange({ id: p.id, nombre: p.nombre })
+                  setBusqueda('')
+                  setAbierto(false)
+                }}
+                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0">
+                <div className="text-[12px] font-medium text-gray-900">{p.nombre}</div>
+                {p.tipo && <div className="text-[11px] text-gray-400">{p.tipo}</div>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <button onClick={onNuevo}
+        className="flex items-center gap-1.5 text-[12px] text-teal-600 font-medium hover:underline self-start">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/>
+        </svg>
+        Nuevo proveedor
+      </button>
+    </div>
+  )
+}
+
+// ── Modal nuevo proveedor (simplificado) ──────────────────────
+
+function ModalNuevoProveedor({ onGuardar, onCerrar }: {
+  onGuardar: (p: { id: number; nombre: string }) => void
+  onCerrar: () => void
+}) {
+  const [nombre, setNombre] = useState('')
+  const [telefono, setTelefono] = useState('')
+  const [tipo, setTipo] = useState('')
+  const [email, setEmail] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleGuardar = async () => {
+    if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
+    setGuardando(true)
+    const supabase = createClient()
+    const { data, error: err } = await supabase
+      .from('proveedores')
+      .insert({
+        nombre: nombre.trim(),
+        telefono: telefono.trim() || null,
+        tipo: tipo.trim() || null,
+        email: email.trim() || null,
+        activo: true,
+      })
+      .select('id, nombre')
+      .single()
+    if (err || !data) { setError('Error al guardar'); setGuardando(false); return }
+    onGuardar(data)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium text-gray-900">Nuevo proveedor</h3>
+          <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+            Podés completar más datos desde Proveedores
+          </span>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Nombre *</label>
+            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+              placeholder="Nombre del proveedor" autoFocus
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Teléfono</label>
+              <input type="text" value={telefono} onChange={e => setTelefono(e.target.value)}
+                placeholder="11 XXXX XXXX"
+                className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Rubro</label>
+              <input type="text" value={tipo} onChange={e => setTipo(e.target.value)}
+                placeholder="Ej: Textil"
+                className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="opcional"
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+          </div>
+        </div>
+        {error && <p className="text-[11px] text-red-600">{error}</p>}
+        <div className="flex gap-2">
+          <button onClick={onCerrar}
+            className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+            Cancelar
+          </button>
+          <button onClick={handleGuardar} disabled={guardando}
+            className="flex-1 py-2 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+            {guardando ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -73,10 +244,15 @@ function ModalInsumo({ insumo, categorias, onGuardar, onCerrar }: {
   const [stock, setStock] = useState(insumo?.stock ?? 0)
   const [costo, setCosto] = useState(insumo?.costo ?? 0)
   const [minimo, setMinimo] = useState(insumo?.minimo ?? 0)
-  const [proveedor, setProveedor] = useState(insumo?.proveedor ?? '')
+  const [proveedor, setProveedor] = useState<{ id: number; nombre: string } | null>(
+    insumo?.proveedor_id ? { id: insumo.proveedor_id, nombre: insumo.proveedor ?? '' } : null
+  )
   const [esFabricable, setEsFabricable] = useState(insumo?.es_fabricable ?? false)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+  const [modalNuevoProv, setModalNuevoProv] = useState(false)
+
+  const unidades = ['unidades', 'kg', 'gramos', 'litros', 'ml', 'metros', 'cm', 'hojas', 'rollos']
 
   const handleGuardar = async () => {
     if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
@@ -89,98 +265,109 @@ function ModalInsumo({ insumo, categorias, onGuardar, onCerrar }: {
       stock,
       costo,
       minimo,
-      proveedor: proveedor.trim() || undefined,
+      proveedor_id: proveedor?.id ?? undefined,
+      proveedor: proveedor?.nombre ?? undefined,
       es_fabricable: esFabricable,
     }, insumo?.id)
     if (ok) onCerrar()
     else { setError('Error al guardar el insumo'); setGuardando(false) }
   }
 
-  const unidades = ['unidades', 'kg', 'gramos', 'litros', 'ml', 'metros', 'cm', 'hojas', 'rollos']
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-md flex flex-col gap-4">
-        <h3 className="text-sm font-medium text-gray-900">
-          {insumo ? 'Editar insumo' : 'Nuevo insumo'}
-        </h3>
+    <>
+      {modalNuevoProv && (
+        <ModalNuevoProveedor
+          onGuardar={p => { setProveedor(p); setModalNuevoProv(false) }}
+          onCerrar={() => setModalNuevoProv(false)}
+        />
+      )}
 
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Nombre *</label>
-            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
-              placeholder="Ej: Hilo macramé natural" autoFocus
-              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
-          </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-md flex flex-col gap-4">
+          <h3 className="text-sm font-medium text-gray-900">
+            {insumo ? 'Editar insumo' : 'Nuevo insumo'}
+          </h3>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] text-gray-500 uppercase tracking-wide">
-              Categoría * — elegí una existente o escribí una nueva
-            </label>
-            <InputCategoria
-              value={categoria}
-              onChange={setCategoria}
-              categorias={categorias}
-            />
-          </div>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Nombre *</label>
+              <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+                placeholder="Ej: Hilo macramé natural" autoFocus
+                className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+            </div>
 
-          <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Unidad</label>
-              <select value={unidad} onChange={e => setUnidad(e.target.value)}
-                className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400">
-                {unidades.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">
+                Categoría * — elegí una existente o escribí una nueva
+              </label>
+              <InputCategoria
+                value={categoria}
+                onChange={setCategoria}
+                categorias={categorias}
+              />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Costo unitario</label>
-              <input type="number" min={0} value={costo} onChange={e => setCosto(Number(e.target.value))}
-                className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400" />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Stock mínimo</label>
-              <input type="number" min={0} value={minimo} onChange={e => setMinimo(Number(e.target.value))}
-                className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400" />
-            </div>
-            {!insumo && (
+
+            <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-gray-500 uppercase tracking-wide">Stock inicial</label>
-                <input type="number" min={0} value={stock} onChange={e => setStock(Number(e.target.value))}
+                <label className="text-[11px] text-gray-500 uppercase tracking-wide">Unidad</label>
+                <select value={unidad} onChange={e => setUnidad(e.target.value)}
+                  className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400">
+                  {unidades.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] text-gray-500 uppercase tracking-wide">Costo unitario</label>
+                <input type="number" min={0} value={costo} onChange={e => setCosto(Number(e.target.value))}
                   className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400" />
               </div>
-            )}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] text-gray-500 uppercase tracking-wide">Stock mínimo</label>
+                <input type="number" min={0} value={minimo} onChange={e => setMinimo(Number(e.target.value))}
+                  className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400" />
+              </div>
+              {!insumo && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] text-gray-500 uppercase tracking-wide">Stock inicial</label>
+                  <input type="number" min={0} value={stock} onChange={e => setStock(Number(e.target.value))}
+                    className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400" />
+                </div>
+              )}
+            </div>
+
+            {/* Proveedor con buscador real */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Proveedor</label>
+              <SelectorProveedor
+                value={proveedor}
+                onChange={setProveedor}
+                onNuevo={() => setModalNuevoProv(true)}
+              />
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={esFabricable}
+                onChange={e => setEsFabricable(e.target.checked)} className="rounded" />
+              <span className="text-[12px] text-gray-700">
+                Es fabricable (tiene receta de producción propia)
+              </span>
+            </label>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Proveedor (opcional)</label>
-            <input type="text" value={proveedor} onChange={e => setProveedor(e.target.value)}
-              placeholder="Nombre del proveedor"
-              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+          {error && <p className="text-[11px] text-red-600">{error}</p>}
+
+          <div className="flex gap-2">
+            <button onClick={onCerrar}
+              className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+              Cancelar
+            </button>
+            <button onClick={handleGuardar} disabled={guardando}
+              className="flex-1 py-2 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+              {guardando ? 'Guardando...' : 'Guardar insumo'}
+            </button>
           </div>
-
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={esFabricable}
-              onChange={e => setEsFabricable(e.target.checked)} className="rounded" />
-            <span className="text-[12px] text-gray-700">
-              Es fabricable (tiene receta de producción propia)
-            </span>
-          </label>
-        </div>
-
-        {error && <p className="text-[11px] text-red-600">{error}</p>}
-
-        <div className="flex gap-2">
-          <button onClick={onCerrar}
-            className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
-            Cancelar
-          </button>
-          <button onClick={handleGuardar} disabled={guardando}
-            className="flex-1 py-2 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
-            {guardando ? 'Guardando...' : 'Guardar insumo'}
-          </button>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -306,7 +493,7 @@ export default function InsumosPage() {
   })
 
   const handleEliminar = async (id: number) => {
-    if (!confirm('¿Eliminar este insumo? Esta acción no se puede deshacer.')) return
+    if (!confirm('¿Eliminar este insumo?')) return
     setEliminando(id)
     await eliminarInsumo(id)
     setEliminando(null)
@@ -378,7 +565,7 @@ export default function InsumosPage() {
         ))}
       </div>
 
-      {/* Filtros — con categorías dinámicas */}
+      {/* Filtros */}
       <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
         <input type="text" placeholder="Buscar por nombre, categoría o proveedor..."
           value={filtros.busqueda} onChange={e => setFiltros({ busqueda: e.target.value })}
@@ -387,7 +574,6 @@ export default function InsumosPage() {
         <select value={filtros.categoria} onChange={e => setFiltros({ categoria: e.target.value })}
           className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:border-teal-400">
           <option value="">Todas las categorías</option>
-          {/* Categorías reales cargadas desde los insumos */}
           {categorias.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={filtros.estado_stock} onChange={e => setFiltros({ estado_stock: e.target.value })}
@@ -413,11 +599,6 @@ export default function InsumosPage() {
           <span className="text-xs text-gray-400">
             {loading ? 'Cargando...' : `${insumosFiltrados.length} insumos`}
           </span>
-          <select className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-600">
-            <option>Nombre A→Z</option>
-            <option>Menor stock primero</option>
-            <option>Mayor valor en stock</option>
-          </select>
         </div>
 
         <table className="w-full text-[12px]">
