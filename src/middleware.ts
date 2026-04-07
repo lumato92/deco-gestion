@@ -9,7 +9,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Rutas públicas — no requieren login
-  const rutasPublicas = ['/login', '/api/auth/login']
+  const rutasPublicas = ['/login', '/api/auth/login','api/pagos/webhook']
   if (rutasPublicas.some(r => pathname.startsWith(r))) {
     return NextResponse.next()
   }
