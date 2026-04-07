@@ -549,6 +549,18 @@ export default function VentasPage() {
                                 Cobrar
                               </button>
                             )}
+                            {(v.estado === 'confirmado' || v.estado === 'en_fabricacion' || v.estado === 'entregado') && (
+                              <a href={`/api/pdf/remito?id=${v.id}`} target="_blank"
+                                className="text-[11px] px-2 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+                                Remito
+                              </a>
+                            )}
+                            {v.estado === 'entregado' && (
+                              <a href={`/api/pdf/ticket?id=${v.id}`} target="_blank"
+                                className="text-[11px] px-2 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+                                Ticket
+                              </a>
+                            )}
                             <button onClick={() => setModalEditar(v)}
                               className="text-[11px] px-2 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
                               Editar
