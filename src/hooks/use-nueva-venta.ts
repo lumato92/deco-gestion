@@ -46,6 +46,7 @@ const RECARGO: Record<MetodoPago, number> = {
   transferencia: 0,
   debito: 10,
   credito: 20,
+  mercadopago: 0,
 }
 
 export function useNuevaVenta() {
@@ -107,8 +108,9 @@ export function useNuevaVenta() {
   }, [])
 
   // ── Confirmar venta ───────────────────────────────────────
+  // Retorna el id del pedido creado, o false si hubo error
 
-  const confirmarVenta = useCallback(async (): Promise<boolean> => {
+  const confirmarVenta = useCallback(async (): Promise<number | false> => {
     if (form.items.length === 0) {
       setError('Agregá al menos un producto')
       return false
@@ -155,29 +157,29 @@ export function useNuevaVenta() {
 
       if (errItems) throw new Error(errItems.message)
 
-      // 3. Registrar pago
-      const { error: errPago } = await supabase
-        .from('pagos_pedido')
-        .insert({
-          pedido_id: pedido.id,
-          tipo: form.con_sena ? 'seña' : 'pago_total',
-          metodo_pago: form.metodo_pago,
-          monto: form.con_sena ? form.monto_sena : total,
-        })
+// 3. Registrar pago — si es MP lo omitimos, el webhook lo registra cuando se acredite
+if (form.metodo_pago !== 'mercadopago') {
+  const { error: errPago } = await supabase
+    .from('pagos_pedido')
+    .insert({
+      pedido_id: pedido.id,
+      tipo: form.con_sena ? 'seña' : 'pago_total',
+      metodo_pago: form.metodo_pago,
+      monto: form.con_sena ? form.monto_sena : total,
+    })
 
-      if (errPago) throw new Error(errPago.message)
+  if (errPago) throw new Error(errPago.message)
+}
 
       // 4. Descontar stock via función de Supabase
       const { data: resultado } = await supabase
         .rpc('descontar_stock_pedido', { p_pedido_id: pedido.id })
 
       if (resultado && !resultado.ok) {
-        // Stock insuficiente — el pedido se creó igual pero el stock no se descontó
-        // Se puede manejar mostrando el error sin revertir
         setError(`Stock insuficiente: ${JSON.stringify(resultado.errores)}`)
       }
 
-      return true
+      return pedido.id
     } catch (e: any) {
       setError(e.message ?? 'Error al confirmar la venta')
       return false

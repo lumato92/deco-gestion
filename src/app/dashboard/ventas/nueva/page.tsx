@@ -34,11 +34,21 @@ function normalizar(str: string) {
 }
 
 // ── Modal popup de confirmación ────────────────────────────────────────────────
-function PopupExito({ total, onNuevaVenta, onDashboard }: {
+function PopupExito({ total, linkMP, onNuevaVenta, onDashboard }: {
   total: number
+  linkMP?: string
   onNuevaVenta: () => void
   onDashboard: () => void
 }) {
+  const [copiado, setCopiado] = useState(false)
+
+  const copiarLink = () => {
+    if (!linkMP) return
+    navigator.clipboard.writeText(linkMP)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2000)
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl border border-gray-200 p-8 w-full max-w-sm text-center flex flex-col items-center gap-4">
@@ -53,6 +63,36 @@ function PopupExito({ total, onNuevaVenta, onDashboard }: {
             {formatMonto(total)} · Stock descontado automáticamente
           </p>
         </div>
+
+        {linkMP && (
+          <div className="w-full flex flex-col gap-2">
+            <p className="text-[12px] text-gray-500 text-left">
+              Link de pago generado — compartilo con el cliente
+            </p>
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={linkMP}
+                className="flex-1 text-[11px] bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 truncate"
+              />
+              <button
+                onClick={copiarLink}
+                className="px-3 py-1.5 text-[11px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
+              >
+                {copiado ? '✓ Copiado' : 'Copiar'}
+              </button>
+            </div>
+            <a
+              href={linkMP}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-blue-600 hover:underline text-left"
+            >
+              Abrir en Mercado Pago →
+            </a>
+          </div>
+        )}
+
         <div className="flex gap-3 w-full">
           <button
             onClick={onNuevaVenta}
@@ -188,6 +228,7 @@ export default function NuevaVentaPage() {
 
   const [ventaConfirmada, setVentaConfirmada] = useState(false)
   const [totalConfirmado, setTotalConfirmado] = useState(0)
+  const [linkMP, setLinkMP] = useState<string | undefined>(undefined)
 
   // Cargar productos al montar
   useEffect(() => {
@@ -246,11 +287,34 @@ export default function NuevaVentaPage() {
 
   const handleConfirmar = async () => {
     const montoFinal = total
-    const ok = await confirmarVenta()
-    if (ok) {
-      setTotalConfirmado(montoFinal)
-      setVentaConfirmada(true)
+    const esMercadoPago = form.metodo_pago === 'mercadopago'
+
+    const pedidoId = await confirmarVenta()
+    if (pedidoId === false) return
+
+    setTotalConfirmado(montoFinal)
+
+    if (esMercadoPago) {
+      try {
+        const res = await fetch('/api/pagos/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pedido_id: pedidoId,
+            descripcion: `Pedido #${pedidoId}${clienteSeleccionado ? ` - ${clienteSeleccionado.nombre}` : ''}`,
+            monto: montoFinal,
+            email_cliente: undefined,
+          }),
+        })
+        const data = await res.json()
+        if (data.link) setLinkMP(data.link)
+      } catch (e: any) {
+  console.error('Error generando link MP:', e)
+  alert('Error generando link: ' + (e?.message ?? 'desconocido'))
+}
     }
+
+    setVentaConfirmada(true)
   }
 
   return (
@@ -260,7 +324,14 @@ export default function NuevaVentaPage() {
       {ventaConfirmada && (
         <PopupExito
           total={totalConfirmado}
-          onNuevaVenta={() => { resetForm(); setVentaConfirmada(false); setClienteSeleccionado(null); setMostrarCliente(false) }}
+          linkMP={linkMP}
+          onNuevaVenta={() => {
+            resetForm()
+            setVentaConfirmada(false)
+            setClienteSeleccionado(null)
+            setMostrarCliente(false)
+            setLinkMP(undefined)
+          }}
           onDashboard={() => router.push('/dashboard')}
         />
       )}
@@ -481,12 +552,13 @@ export default function NuevaVentaPage() {
           {/* Método de pago */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Método de pago</div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {([
                 { key: 'efectivo',      label: 'Efectivo',      hint: 'Sin recargo' },
                 { key: 'transferencia', label: 'Transferencia', hint: 'Sin recargo' },
                 { key: 'debito',        label: 'Débito',        hint: '+10% recargo' },
                 { key: 'credito',       label: 'Crédito',       hint: '+20% recargo' },
+                { key: 'mercadopago',   label: 'Mercado Pago',  hint: 'Link online' },
               ] as const).map(m => (
                 <MetodoPagoBtn key={m.key} label={m.label} hint={m.hint}
                   selected={form.metodo_pago === m.key}
@@ -494,23 +566,34 @@ export default function NuevaVentaPage() {
               ))}
             </div>
 
-            {/* Seña */}
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={form.con_sena}
-                  onChange={e => setForm({ con_sena: e.target.checked })} className="rounded" />
-                <span className="text-[12px] text-gray-700">El cliente deja una seña</span>
-              </label>
-              {form.con_sena && (
-                <div className="mt-2 flex items-center gap-2">
-                  <input type="number" min={0} value={form.monto_sena || ''}
-                    onChange={e => setForm({ monto_sena: Number(e.target.value) })}
-                    placeholder="Monto de la seña"
-                    className="flex-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400" />
-                  <span className="text-[11px] text-gray-400">efectivo</span>
-                </div>
-              )}
-            </div>
+            {/* Aviso MP */}
+            {form.metodo_pago === 'mercadopago' && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-[11px] text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                  Se generará un link de pago al confirmar la venta. El pedido se marcará como cobrado automáticamente cuando el cliente pague.
+                </p>
+              </div>
+            )}
+
+            {/* Seña — solo si no es MP */}
+            {form.metodo_pago !== 'mercadopago' && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.con_sena}
+                    onChange={e => setForm({ con_sena: e.target.checked })} className="rounded" />
+                  <span className="text-[12px] text-gray-700">El cliente deja una seña</span>
+                </label>
+                {form.con_sena && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input type="number" min={0} value={form.monto_sena || ''}
+                      onChange={e => setForm({ monto_sena: Number(e.target.value) })}
+                      placeholder="Monto de la seña"
+                      className="flex-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400" />
+                    <span className="text-[11px] text-gray-400">efectivo</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Totales */}
@@ -545,7 +628,12 @@ export default function NuevaVentaPage() {
             <button onClick={handleConfirmar}
               disabled={guardando || form.items.length === 0}
               className="w-full py-2.5 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-              {guardando ? 'Registrando...' : `Confirmar venta · ${formatMonto(total)}`}
+              {guardando
+                ? 'Registrando...'
+                : form.metodo_pago === 'mercadopago'
+                  ? `Confirmar y generar link · ${formatMonto(total)}`
+                  : `Confirmar venta · ${formatMonto(total)}`
+              }
             </button>
             <button onClick={() => router.push('/dashboard/ventas/presupuestos/nuevo')}
               className="w-full py-2 text-[12px] text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
