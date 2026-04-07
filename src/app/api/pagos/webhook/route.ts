@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { MercadoPagoConfig, Payment } from 'mercadopago'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN!,
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'external_reference inválido' }, { status: 400 })
     }
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Registramos el pago en pagos_pedido
     const { error: errPago } = await supabase.from('pagos_pedido').insert({
@@ -65,5 +65,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Error procesando webhook' }, { status: 500 })
   }
 }
-
-export const dynamic = 'force-dynamic'
