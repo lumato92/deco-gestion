@@ -10,6 +10,28 @@ import {
   FabricacionPendiente,
 } from '@/components/dashboard/tablas'
 
+const [generandoLink, setGenerandoLink] = useState<number | null>(null)
+
+const generarLinkPago = async (venta: PedidoConTotal) => {
+  setGenerandoLink(venta.id)
+  try {
+    const res = await fetch('/api/pagos/link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pedido_id: venta.id,
+        descripcion: `Pedido #${venta.id} - ${venta.cliente_nombre ?? 'cliente'}`,
+        monto: venta.pendiente,
+        email_cliente: venta.cliente_email ?? undefined,
+      }),
+    })
+    const data = await res.json()
+    if (data.link) window.open(data.link, '_blank')
+  } finally {
+    setGenerandoLink(null)
+  }
+}
+
 export default function DashboardPage() {
   const {
     resumen,
