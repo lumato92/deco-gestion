@@ -37,6 +37,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-5 flex flex-col gap-4">
+
       {/* Topbar */}
       <div className="flex items-center justify-between">
         <div>
@@ -73,6 +74,7 @@ export default function DashboardPage() {
         <AlertasStock alertas={alertasStock} loading={loading} />
         <FabricacionPendiente items={fabricacionPendiente} loading={loading} />
       </div>
+
     </div>
   )
 }

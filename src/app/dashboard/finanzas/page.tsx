@@ -85,18 +85,9 @@ export default function FinanzasPage() {
     <div className="p-5 flex flex-col gap-4">
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-gray-400 mb-1">Negocio</p>
-          <h1 className="text-base font-medium text-gray-900 capitalize">Finanzas · {mesLabel}</h1>
-        </div>
-        <a
-          href={`/api/pdf/financiero?mes=${new Date().getMonth() + 1}&anio=${new Date().getFullYear()}`}
-          target="_blank"
-          className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-600 hover:bg-gray-50"
-        >
-          Exportar PDF
-        </a>
+      <div>
+        <p className="text-xs text-gray-400 mb-1">Negocio</p>
+        <h1 className="text-base font-medium text-gray-900 capitalize">Finanzas · {mesLabel}</h1>
       </div>
 
       {/* Métricas del mes */}

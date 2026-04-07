@@ -8,7 +8,7 @@ export type EstadoPedido =
   | 'entregado'
   | 'cancelado'
 
-export type MetodoPago = 'efectivo' | 'transferencia' | 'debito' | 'credito' | 'mercadopago'
+export type MetodoPago = 'efectivo' | 'transferencia' | 'debito' | 'credito'
 export type CanalVenta = 'directo' | 'whatsapp' | 'instagram' | 'tienda' | 'ecommerce'
 
 export interface Cliente {
