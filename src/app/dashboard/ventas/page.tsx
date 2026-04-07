@@ -26,8 +26,8 @@ const MP_CFG: Record<MetodoPago, { label: string; cls: string }> = {
   transferencia: { label: 'Transferencia', cls: 'bg-blue-50 text-blue-800' },
   debito:        { label: 'Débito',        cls: 'bg-amber-50 text-amber-800' },
   credito:       { label: 'Crédito',       cls: 'bg-pink-50 text-pink-800' },
+  mercadopago:   { label: 'Mercado Pago',  cls: 'bg-blue-50 text-blue-800' },
 }
-
 function Badge({ text, cls }: { text: string; cls: string }) {
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>
