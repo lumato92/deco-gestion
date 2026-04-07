@@ -8,11 +8,11 @@ const COOKIE_NAME = 'deco_session'
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Rutas públicas — no requieren login
-  const rutasPublicas = ['/login', '/api/auth/login']
-  if (rutasPublicas.some(r => pathname.startsWith(r))) {
-    return NextResponse.next()
-  }
+// Rutas públicas — no requieren login
+const rutasPublicas = ['/login', '/api/auth/login', '/api/pagos/webhook', '/api/pagos/link']
+if (rutasPublicas.some(r => pathname.startsWith(r))) {
+  return NextResponse.next()
+}
 
   // Verificar que existe la cookie de sesión
   const token = request.cookies.get(COOKIE_NAME)?.value
@@ -63,6 +63,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.png|.*\\.jpg|.*\\.svg).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.png|.*\\.jpg|.*\\.svg|api/pagos).*)',
   ],
 }
