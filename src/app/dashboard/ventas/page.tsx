@@ -39,9 +39,19 @@ function Badge({ text, cls }: { text: string; cls: string }) {
 
 // ── Determina el badge de estado, con caso especial MP pendiente ──────────────
 function BadgeEstado({ venta }: { venta: PedidoConTotal }) {
+  // MP pendiente de pago
   if (venta.metodo_pago === 'mercadopago' && venta.pendiente > 0) {
     return <Badge text="Pago MP pendiente" cls="bg-orange-50 text-orange-700" />
   }
+  // MP cobrado automáticamente vía webhook
+  if (venta.metodo_pago === 'mercadopago' && venta.pendiente <= 0 && venta.estado === 'entregado') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700">
+        <span>✓ Cobrado MP</span>
+      </span>
+    )
+  }
+  // Estado normal
   const cfg = ESTADO_CFG[venta.estado]
   return <Badge text={cfg.label} cls={cfg.cls} />
 }
