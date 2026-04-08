@@ -54,15 +54,11 @@ function PopupExito({ total, pedidoId, entregaInmediata, linkMP, onNuevaVenta, o
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl border border-gray-200 p-8 w-full max-w-sm text-center flex flex-col items-center gap-4">
-
-        {/* Ícono */}
         <div className="w-14 h-14 rounded-full bg-teal-100 flex items-center justify-center">
           <svg className="w-7 h-7 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-
-        {/* Título */}
         <div>
           <h2 className="text-base font-medium text-gray-900">Venta registrada</h2>
           <p className="text-sm text-gray-400 mt-1">
@@ -70,7 +66,6 @@ function PopupExito({ total, pedidoId, entregaInmediata, linkMP, onNuevaVenta, o
           </p>
         </div>
 
-        {/* Link MP si corresponde */}
         {linkMP && (
           <div className="w-full flex flex-col gap-2">
             <p className="text-[12px] text-gray-500 text-left">
@@ -89,54 +84,36 @@ function PopupExito({ total, pedidoId, entregaInmediata, linkMP, onNuevaVenta, o
                 {copiado ? '✓ Copiado' : 'Copiar'}
               </button>
             </div>
-            <a
-              href={linkMP}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] text-blue-600 hover:underline text-left"
-            >
+            <a href={linkMP} target="_blank" rel="noopener noreferrer"
+              className="text-[11px] text-blue-600 hover:underline text-left">
               Abrir en Mercado Pago →
             </a>
           </div>
         )}
 
-        {/* Accesos rápidos a documentos si fue entrega inmediata */}
         {entregaInmediata && (
           <div className="w-full flex flex-col gap-2">
             <p className="text-[12px] text-gray-500 text-left">Documentos disponibles</p>
             <div className="flex gap-2">
-              <a
-                href={`/api/pdf/ticket?id=${pedidoId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-2 text-[12px] font-medium text-center bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-              >
+              <a href={`/api/pdf/ticket?id=${pedidoId}`} target="_blank" rel="noopener noreferrer"
+                className="flex-1 py-2 text-[12px] font-medium text-center bg-teal-600 text-white rounded-lg hover:bg-teal-700">
                 Ticket de caja
               </a>
-              <a
-                href={`/api/pdf/remito?id=${pedidoId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-2 text-[12px] font-medium text-center border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
-              >
+              <a href={`/api/pdf/remito?id=${pedidoId}`} target="_blank" rel="noopener noreferrer"
+                className="flex-1 py-2 text-[12px] font-medium text-center border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
                 Remito
               </a>
             </div>
           </div>
         )}
 
-        {/* Acciones */}
         <div className="flex gap-3 w-full">
-          <button
-            onClick={onNuevaVenta}
-            className="flex-1 py-2 text-sm font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
-          >
+          <button onClick={onNuevaVenta}
+            className="flex-1 py-2 text-sm font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
             Nueva venta
           </button>
-          <button
-            onClick={onDashboard}
-            className="flex-1 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-          >
+          <button onClick={onDashboard}
+            className="flex-1 py-2 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700">
             Ir al dashboard
           </button>
         </div>
@@ -177,19 +154,15 @@ function ModalNuevoCliente({ onGuardar, onCancelar }: {
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] text-gray-400 uppercase tracking-wide">Nombre *</label>
-            <input
-              type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
               placeholder="Nombre completo o nombre del local" autoFocus
-              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
-            />
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[11px] text-gray-400 uppercase tracking-wide">Teléfono</label>
-            <input
-              type="text" value={telefono} onChange={e => setTelefono(e.target.value)}
+            <input type="text" value={telefono} onChange={e => setTelefono(e.target.value)}
               placeholder="11 XXXX XXXX"
-              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
-            />
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[11px] text-gray-400 uppercase tracking-wide">Canal</label>
@@ -203,11 +176,9 @@ function ModalNuevoCliente({ onGuardar, onCancelar }: {
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[11px] text-gray-400 uppercase tracking-wide">Email (opcional)</label>
-            <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)}
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="Para enviar presupuestos"
-              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
-            />
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
           </div>
         </div>
         {error && <p className="text-[11px] text-red-600">{error}</p>}
@@ -238,6 +209,77 @@ function MetodoPagoBtn({ label, hint, selected, onClick }: {
   )
 }
 
+// ── Formulario inline de producto libre ───────────────────────────────────────
+function FormProductoLibre({ onAgregar, onCancelar }: {
+  onAgregar: (nombre: string, precio: number, cantidad: number) => void
+  onCancelar: () => void
+}) {
+  const [nombre, setNombre] = useState('')
+  const [precio, setPrecio] = useState<number | ''>('')
+  const [cantidad, setCantidad] = useState(1)
+  const [error, setError] = useState('')
+
+  const handleAgregar = () => {
+    if (!nombre.trim()) { setError('El nombre es obligatorio'); return }
+    if (!precio || precio <= 0) { setError('El precio debe ser mayor a 0'); return }
+    onAgregar(nombre.trim(), Number(precio), cantidad)
+  }
+
+  return (
+    <div className="mt-3 border border-dashed border-purple-300 bg-purple-50 rounded-lg p-3 flex flex-col gap-2">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[11px] font-medium text-purple-700 uppercase tracking-wide">Producto libre</span>
+        <span className="text-[10px] text-purple-400">sin stock ni catálogo</span>
+      </div>
+      <input
+        type="text"
+        placeholder="Nombre del producto o servicio..."
+        value={nombre}
+        onChange={e => { setNombre(e.target.value); setError('') }}
+        autoFocus
+        className="text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400"
+      />
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <input
+            type="number"
+            placeholder="Precio unitario"
+            min={0}
+            value={precio}
+            onChange={e => { setPrecio(e.target.value === '' ? '' : Number(e.target.value)); setError('') }}
+            className="w-full text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400"
+          />
+        </div>
+        <div className="w-20">
+          <input
+            type="number"
+            placeholder="Cant."
+            min={1}
+            value={cantidad}
+            onChange={e => setCantidad(Math.max(1, Number(e.target.value)))}
+            className="w-full text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 text-center focus:outline-none focus:border-purple-400"
+          />
+        </div>
+      </div>
+      {error && <p className="text-[11px] text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          onClick={onCancelar}
+          className="flex-1 py-1.5 text-[12px] border border-gray-200 rounded-lg text-gray-500 hover:bg-white"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={handleAgregar}
+          className="flex-1 py-1.5 text-[12px] font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+        >
+          Agregar
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Página ─────────────────────────────────────────────────────────────────────
 export default function NuevaVentaPage() {
   const router = useRouter()
@@ -251,6 +293,7 @@ export default function NuevaVentaPage() {
   const [busquedaProd, setBusquedaProd] = useState('')
   const [resultadosProd, setResultadosProd] = useState<ProductoBuscado[]>([])
   const [todosProds, setTodosProds] = useState<ProductoBuscado[]>([])
+  const [mostrarFormLibre, setMostrarFormLibre] = useState(false)
 
   const [mostrarCliente, setMostrarCliente] = useState(false)
   const [modalNuevoCliente, setModalNuevoCliente] = useState(false)
@@ -318,6 +361,18 @@ export default function NuevaVentaPage() {
     setTodosClientes(prev => [c, ...prev])
     seleccionarCliente(c)
     setModalNuevoCliente(false)
+  }
+
+  const agregarProductoLibre = (nombre: string, precio: number, cantidad: number) => {
+    agregarItem({
+      producto_id: null,
+      nombre_producto: nombre,
+      cantidad,
+      precio_unitario: precio,
+      costo_unitario: 0,
+      requiere_fabricacion: false,
+    })
+    setMostrarFormLibre(false)
   }
 
   const handleConfirmar = async () => {
@@ -403,7 +458,18 @@ export default function NuevaVentaPage() {
 
           {/* Productos */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-[13px] font-medium text-gray-900 mb-3">Productos</div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[13px] font-medium text-gray-900">Productos</div>
+              {!mostrarFormLibre && (
+                <button
+                  onClick={() => setMostrarFormLibre(true)}
+                  className="text-[11px] text-purple-600 font-medium hover:underline"
+                >
+                  + Producto libre
+                </button>
+              )}
+            </div>
+
             <div className="relative mb-3">
               <input
                 type="text"
@@ -437,6 +503,14 @@ export default function NuevaVentaPage() {
               )}
             </div>
 
+            {/* Formulario producto libre */}
+            {mostrarFormLibre && (
+              <FormProductoLibre
+                onAgregar={agregarProductoLibre}
+                onCancelar={() => setMostrarFormLibre(false)}
+              />
+            )}
+
             {/* Tabla de items */}
             {form.items.length === 0 ? (
               <div className="text-center py-6 text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg">
@@ -457,7 +531,16 @@ export default function NuevaVentaPage() {
                   <tbody>
                     {form.items.map((item, idx) => (
                       <tr key={idx} className="border-b border-gray-100 last:border-0">
-                        <td className="py-2 font-medium text-gray-900">{item.nombre_producto}</td>
+                        <td className="py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">{item.nombre_producto}</span>
+                            {item.producto_id === null && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                                libre
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-2">
                           <input type="number" min={1} value={item.cantidad}
                             onChange={e => actualizarItem(idx, { cantidad: Number(e.target.value) })}
@@ -606,7 +689,6 @@ export default function NuevaVentaPage() {
               ))}
             </div>
 
-            {/* Aviso MP */}
             {form.metodo_pago === 'mercadopago' && (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <p className="text-[11px] text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
@@ -615,7 +697,6 @@ export default function NuevaVentaPage() {
               </div>
             )}
 
-            {/* Seña — solo si no es MP */}
             {form.metodo_pago !== 'mercadopago' && (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -639,9 +720,7 @@ export default function NuevaVentaPage() {
           {/* Entrega */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Entrega</div>
-
-            {/* Entrega inmediata — oculto si es MP */}
-            {form.metodo_pago !== 'mercadopago' && (
+            {form.metodo_pago !== 'mercadopago' ? (
               <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 form.entrega_inmediata
                   ? 'border-teal-500 bg-teal-50'
@@ -660,9 +739,7 @@ export default function NuevaVentaPage() {
                   </div>
                 </div>
               </label>
-            )}
-
-            {form.metodo_pago === 'mercadopago' && (
+            ) : (
               <p className="text-[12px] text-gray-400">
                 Para ventas con Mercado Pago la entrega se confirma cuando se acredita el pago.
               </p>
