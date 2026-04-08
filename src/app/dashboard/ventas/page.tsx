@@ -28,12 +28,22 @@ const MP_CFG: Record<MetodoPago, { label: string; cls: string }> = {
   credito:       { label: 'Crédito',       cls: 'bg-pink-50 text-pink-800' },
   mercadopago:   { label: 'Mercado Pago',  cls: 'bg-blue-50 text-blue-800' },
 }
+
 function Badge({ text, cls }: { text: string; cls: string }) {
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${cls}`}>
       {text}
     </span>
   )
+}
+
+// ── Determina el badge de estado, con caso especial MP pendiente ──────────────
+function BadgeEstado({ venta }: { venta: PedidoConTotal }) {
+  if (venta.metodo_pago === 'mercadopago' && venta.pendiente > 0) {
+    return <Badge text="Pago MP pendiente" cls="bg-orange-50 text-orange-700" />
+  }
+  const cfg = ESTADO_CFG[venta.estado]
+  return <Badge text={cfg.label} cls={cfg.cls} />
 }
 
 // ── Modal cobrar ──────────────────────────────────────────────
@@ -289,6 +299,116 @@ function MetodoCard({ label, monto, cant, pct, color, activo, onClick }: {
   )
 }
 
+// ── Modal reenviar link MP ────────────────────────────────────
+
+function ModalReenviarLink({ venta, onCerrar }: {
+  venta: PedidoConTotal
+  onCerrar: () => void
+}) {
+  const [copiado, setCopiado] = useState(false)
+  const [generando, setGenerando] = useState(false)
+  const [link, setLink] = useState<string>(venta.mp_link ?? '')
+
+  const copiar = () => {
+    navigator.clipboard.writeText(link)
+    setCopiado(true)
+    setTimeout(() => setCopiado(false), 2000)
+  }
+
+  const regenerar = async () => {
+    setGenerando(true)
+    try {
+      const res = await fetch('/api/pagos/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pedido_id: venta.id,
+          descripcion: `Pedido #${venta.id}${venta.cliente_nombre ? ` - ${venta.cliente_nombre}` : ''}`,
+          monto: venta.pendiente,
+          email_cliente: venta.cliente_email ?? undefined,
+        }),
+      })
+      const data = await res.json()
+      if (data.link) {
+        setLink(data.link)
+        // Guardamos el nuevo link en la DB
+        const supabase = createClient()
+        await supabase.from('pedidos').update({ mp_link: data.link }).eq('id', venta.id)
+      }
+    } finally {
+      setGenerando(false)
+    }
+  }
+
+  const whatsappUrl = `https://wa.me/${
+    venta.cliente_telefono ? venta.cliente_telefono.replace(/\D/g, '') : ''
+  }?text=${encodeURIComponent(`Hola! Te comparto el link para completar tu pago: ${link}`)}`
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+        <div>
+          <h3 className="text-sm font-medium text-gray-900">Link de pago MP</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {venta.cliente_nombre ?? '(sin cliente)'} · Pedido #{venta.id} · {formatMonto(venta.pendiente)} pendiente
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={link}
+              className="flex-1 text-[11px] bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 truncate"
+            />
+            <button
+              onClick={copiar}
+              className="px-3 py-1.5 text-[11px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
+            >
+              {copiado ? '✓ Copiado' : 'Copiar'}
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-1.5 text-[11px] font-medium text-center bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              Enviar por WhatsApp
+            </a>
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-1.5 text-[11px] font-medium text-center border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50"
+            >
+              Abrir link
+            </a>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-2 border-t border-gray-100">
+          <button
+            onClick={regenerar}
+            disabled={generando}
+            className="flex-1 py-1.5 text-[11px] text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          >
+            {generando ? 'Generando...' : 'Regenerar link'}
+          </button>
+          <button
+            onClick={onCerrar}
+            className="flex-1 py-1.5 text-[11px] font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Página ────────────────────────────────────────────────────
 
 export default function VentasPage() {
@@ -300,6 +420,7 @@ export default function VentasPage() {
   const [modalCobrar, setModalCobrar] = useState<PedidoConTotal | null>(null)
   const [modalEditar, setModalEditar] = useState<PedidoConTotal | null>(null)
   const [modalAcciones, setModalAcciones] = useState<PedidoConTotal | null>(null)
+  const [modalReenviarLink, setModalReenviarLink] = useState<PedidoConTotal | null>(null)
 
   const maxMetodo = Math.max(
     resumenMetodos.efectivo, resumenMetodos.transferencia,
@@ -342,6 +463,12 @@ export default function VentasPage() {
           venta={modalAcciones}
           onCompletado={recargar}
           onCerrar={() => setModalAcciones(null)}
+        />
+      )}
+      {modalReenviarLink && (
+        <ModalReenviarLink
+          venta={modalReenviarLink}
+          onCerrar={() => setModalReenviarLink(null)}
         />
       )}
 
@@ -506,8 +633,8 @@ export default function VentasPage() {
                   </tr>
                 )
                 : ventas.map(v => {
-                    const estado = ESTADO_CFG[v.estado]
                     const mp = v.metodo_pago ? MP_CFG[v.metodo_pago] : null
+                    const esMPPendiente = v.metodo_pago === 'mercadopago' && v.pendiente > 0
                     return (
                       <tr key={v.id} className="border-t border-gray-100 hover:bg-gray-50">
                         <td className="px-4 py-2.5 text-gray-400 text-[11px]">#{v.id}</td>
@@ -524,7 +651,7 @@ export default function VentasPage() {
                           {mp ? <Badge text={mp.label} cls={mp.cls} /> : <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-4 py-2.5">
-                          <Badge text={estado.label} cls={estado.cls} />
+                          <BadgeEstado venta={v} />
                         </td>
                         <td className="px-4 py-2.5 text-right font-medium text-gray-900">
                           {formatMonto(v.total_cobrado)}
@@ -543,12 +670,20 @@ export default function VentasPage() {
                         </td>
                         <td className="px-4 py-2.5">
                           <div className="flex gap-1 justify-end">
-                            {v.pendiente > 0 && (
+                            {/* Si es MP pendiente mostramos el botón de reenviar link en lugar de cobrar */}
+                            {esMPPendiente ? (
+                              <button
+                                onClick={() => setModalReenviarLink(v)}
+                                className="text-[11px] px-2.5 py-1 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium"
+                              >
+                                Ver link
+                              </button>
+                            ) : v.pendiente > 0 ? (
                               <button onClick={() => setModalCobrar(v)}
                                 className="text-[11px] px-2.5 py-1 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
                                 Cobrar
                               </button>
-                            )}
+                            ) : null}
                             {(v.estado === 'confirmado' || v.estado === 'en_fabricacion' || v.estado === 'entregado') && (
                               <a href={`/api/pdf/remito?id=${v.id}`} target="_blank"
                                 className="text-[11px] px-2 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">

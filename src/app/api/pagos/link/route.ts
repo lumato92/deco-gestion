@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { MercadoPagoConfig, Preference } from 'mercadopago'
+import { createClient } from '@/lib/supabase/server'
 
 const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN!,
@@ -31,7 +32,20 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    return NextResponse.json({ link: result.init_point })
+    const link = result.init_point
+
+    if (!link) {
+      return NextResponse.json({ error: 'MP no devolvió un link' }, { status: 500 })
+    }
+
+    // Guardamos el link en la DB para poder reenviarlo sin regenerar
+    const supabase = await createClient()
+    await supabase
+      .from('pedidos')
+      .update({ mp_link: link })
+      .eq('id', pedido_id)
+
+    return NextResponse.json({ link })
   } catch (error: any) {
     console.error('Error creando preferencia MP:', error)
     return NextResponse.json({
