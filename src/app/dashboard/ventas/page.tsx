@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client'
 import { formatMonto, formatFecha } from '@/lib/utils'
 import { ModalAccionesVenta } from '@/components/ventas/modal-acciones'
 import type { EstadoPedido, MetodoPago, CanalVenta, PedidoConTotal } from '@/lib/types'
+import { BannerPagosPoint } from '@/components/ventas/banner-pagos-point'
+
 
 // ── Config visual ─────────────────────────────────────────────
 
@@ -481,7 +483,7 @@ export default function VentasPage() {
           onCerrar={() => setModalReenviarLink(null)}
         />
       )}
-
+      <BannerPagosPoint onAsignado={recargar} />
       {/* Topbar */}
       <div className="flex items-center justify-between">
         <div>
