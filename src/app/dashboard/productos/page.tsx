@@ -3,7 +3,7 @@
 // src/app/dashboard/productos/page.tsx
 
 import Link from 'next/link'
-import { useProductos } from '@/hooks/use-productos'
+import { useProductos, type Producto } from '@/hooks/use-productos'
 import { createClient } from '@/lib/supabase/client'
 import { formatMonto } from '@/lib/utils'
 import { useState, useEffect } from 'react'
@@ -33,19 +33,114 @@ function MargenColor({ pct }: { pct: number }) {
   return <span className={`font-medium ${cls}`}>{pct}%</span>
 }
 
-// ── Modal fabricar ────────────────────────────────────────────
+// ── Panel de ajuste de stock inline ──────────────────────────
 
-interface RecetaItem {
-  insumo_id: number
-  insumo_nombre: string
-  cantidad_unit: number
-  unidad: string
-  stock_disponible: number
-  costo_unit: number
+function PanelAjuste({ producto, onAjustar, onCerrar }: {
+  producto: Producto
+  onAjustar: (op: 'entrada' | 'salida' | 'ajuste', cant: number, costo?: number) => Promise<boolean>
+  onCerrar: () => void
+}) {
+  const [operacion, setOperacion] = useState<'entrada' | 'salida' | 'ajuste'>('entrada')
+  const [cantidad, setCantidad] = useState(1)
+  const [nuevoCosto, setNuevoCosto] = useState(producto.costo)
+  const [ajustando, setAjustando] = useState(false)
+  const [error, setError] = useState('')
+
+  const stockResultante = operacion === 'entrada'
+    ? producto.stock + cantidad
+    : operacion === 'salida'
+      ? Math.max(0, producto.stock - cantidad)
+      : cantidad
+
+  const handleAjustar = async () => {
+    if (cantidad <= 0 && operacion !== 'ajuste') { setError('La cantidad debe ser mayor a 0'); return }
+    setAjustando(true)
+    const ok = await onAjustar(operacion, cantidad, operacion === 'entrada' ? nuevoCosto : undefined)
+    if (ok) onCerrar()
+    else { setError('Error al ajustar'); setAjustando(false) }
+  }
+
+  return (
+    <tr>
+      <td colSpan={7} className="p-0">
+        <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
+          <div className="flex items-end gap-4 flex-wrap">
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Operación</label>
+              <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+                {([
+                  { val: 'entrada', label: 'Entrada (compra)' },
+                  { val: 'salida',  label: 'Salida (descarte)' },
+                  { val: 'ajuste',  label: 'Ajuste manual' },
+                ] as const).map(op => (
+                  <button key={op.val} onClick={() => setOperacion(op.val)}
+                    className={`px-3 py-1.5 text-xs font-medium border-r border-gray-200 last:border-0 transition-colors ${
+                      operacion === op.val ? 'bg-white text-gray-900' : 'text-gray-500 hover:bg-gray-100'
+                    }`}>
+                    {op.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">
+                {operacion === 'ajuste' ? 'Nuevo stock total' : 'Cantidad'}
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" min={0} step={1} value={cantidad}
+                  onChange={e => setCantidad(Number(e.target.value))}
+                  className="w-24 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400"
+                />
+                <span className="text-[11px] text-gray-500">u.</span>
+              </div>
+            </div>
+
+            {operacion === 'entrada' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] text-gray-500 uppercase tracking-wide">
+                  Costo unit. (actualiza el precio)
+                </label>
+                <input
+                  type="number" min={0} value={nuevoCosto}
+                  onChange={e => setNuevoCosto(Number(e.target.value))}
+                  className="w-32 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400"
+                />
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Stock resultante</label>
+              <div className="flex items-center gap-1.5 text-sm">
+                <span className="text-gray-400 line-through">{producto.stock} u.</span>
+                <span className="text-gray-400">→</span>
+                <span className={`font-medium ${stockResultante <= producto.minimo ? 'text-red-600' : 'text-teal-700'}`}>
+                  {stockResultante} u.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 ml-auto items-end">
+              {error && <span className="text-[11px] text-red-600">{error}</span>}
+              <button onClick={onCerrar}
+                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-100">
+                Cancelar
+              </button>
+              <button onClick={handleAjustar} disabled={ajustando}
+                className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+                {ajustando ? 'Guardando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  )
 }
 
-// Reemplazar SOLO la función ModalFabricar en productos/page.tsx
-// Todo lo demás queda igual
+// ── Modal fabricar ────────────────────────────────────────────
 
 function ModalFabricar({ producto, onCompletado, onCerrar }: {
   producto: { id: number; nombre: string; stock: number }
@@ -59,43 +154,28 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
   const [receta, setReceta] = useState<any[]>([])
   const [loadingReceta, setLoadingReceta] = useState(true)
 
-  // useEffect correcto para cargar receta con stock REAL de insumos
   useEffect(() => {
     const supabase = createClient()
-
     const cargar = async () => {
-      // Traer receta joinada con stock actual de insumos directamente
       const { data: recetaData } = await supabase
         .from('recetas')
-        .select(`
-          cantidad,
-          insumos (
-            id,
-            nombre,
-            unidad,
-            stock,
-            costo
-          )
-        `)
+        .select(`cantidad, insumos (id, nombre, unidad, stock, costo)`)
         .eq('producto_id', producto.id)
-
       if (recetaData) {
         setReceta(recetaData.map((r: any) => ({
           insumo_id: r.insumos.id,
           insumo_nombre: r.insumos.nombre,
           cantidad_unit: r.cantidad,
           unidad: r.insumos.unidad,
-          stock_disponible: r.insumos.stock,  // stock real y actualizado
+          stock_disponible: r.insumos.stock,
           costo_unit: r.insumos.costo,
         })))
       }
       setLoadingReceta(false)
     }
-
     cargar()
   }, [producto.id])
 
-  // Calcular si hay stock suficiente para la cantidad pedida
   const insuficientes = receta.filter(r => r.stock_disponible < r.cantidad_unit * cantidad)
 
   const handleFabricar = async () => {
@@ -103,25 +183,13 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
     setFabricando(true)
     setError(null)
     setErroresInsumos([])
-
     const supabase = createClient()
     const { data, error: err } = await supabase.rpc('fabricar', {
       p_producto_id: producto.id,
       p_cantidad: cantidad,
     })
-
-    if (err) {
-      setError(err.message)
-      setFabricando(false)
-      return
-    }
-
-    if (!data?.ok) {
-      setErroresInsumos(data?.errores ?? [])
-      setFabricando(false)
-      return
-    }
-
+    if (err) { setError(err.message); setFabricando(false); return }
+    if (!data?.ok) { setErroresInsumos(data?.errores ?? []); setFabricando(false); return }
     onCompletado()
     onCerrar()
   }
@@ -129,7 +197,6 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl border border-gray-200 w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden">
-
         <div className="px-5 py-4 border-b border-gray-100">
           <h3 className="text-sm font-medium text-gray-900">Fabricar producto</h3>
           <p className="text-xs text-gray-400 mt-0.5">
@@ -138,38 +205,24 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
         </div>
 
         <div className="overflow-y-auto flex-1 p-5 flex flex-col gap-4">
-
-          {/* Cantidad */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] text-gray-500 uppercase tracking-wide">
-              Cantidad a fabricar
-            </label>
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Cantidad a fabricar</label>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setCantidad(q => Math.max(1, q - 1))}
-                className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-lg font-medium">
-                −
-              </button>
-              <input
-                type="number" min={1} value={cantidad}
+              <button onClick={() => setCantidad(q => Math.max(1, q - 1))}
+                className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-lg font-medium">−</button>
+              <input type="number" min={1} value={cantidad}
                 onChange={e => setCantidad(Math.max(1, Number(e.target.value)))}
-                className="w-20 text-center text-[16px] font-medium text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400"
-              />
-              <button
-                onClick={() => setCantidad(q => q + 1)}
-                className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-lg font-medium">
-                +
-              </button>
+                className="w-20 text-center text-[16px] font-medium text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+              <button onClick={() => setCantidad(q => q + 1)}
+                className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-lg font-medium">+</button>
               <span className="text-[12px] text-gray-400">unidades</span>
             </div>
           </div>
 
-          {/* Receta con stock real */}
           <div>
             <div className="text-[11px] text-gray-500 uppercase tracking-wide mb-2">
               Insumos necesarios para {cantidad} u.
             </div>
-
             {loadingReceta ? (
               <div className="space-y-2">
                 {Array.from({ length: 3 }).map((_, i) => (
@@ -178,7 +231,7 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
               </div>
             ) : receta.length === 0 ? (
               <div className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
-                ⚠️ Este producto no tiene receta cargada. Agregá los insumos desde Editar producto.
+                ⚠️ Este producto no tiene receta cargada.
               </div>
             ) : (
               <div className="flex flex-col gap-1 bg-gray-50 rounded-xl p-3">
@@ -187,8 +240,7 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
                   const suficiente = r.stock_disponible >= necesario
                   const falta = necesario - r.stock_disponible
                   return (
-                    <div key={r.insumo_id}
-                      className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
+                    <div key={r.insumo_id} className="flex items-center justify-between py-2 border-b border-gray-200 last:border-0">
                       <div className="flex-1">
                         <div className="text-[12px] font-medium text-gray-900">{r.insumo_nombre}</div>
                         <div className="text-[11px] text-gray-400 mt-0.5">
@@ -210,37 +262,26 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
             )}
           </div>
 
-          {/* Errores de Supabase */}
           {erroresInsumos.length > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="text-[12px] font-medium text-red-800 mb-2">
-                Stock insuficiente:
-              </div>
+              <div className="text-[12px] font-medium text-red-800 mb-2">Stock insuficiente:</div>
               {erroresInsumos.map((e: any, i: number) => (
                 <div key={i} className="text-[11px] text-red-700 py-1.5 border-b border-red-100 last:border-0">
-                  <span className="font-medium">{e.insumo}</span>
-                  {' '}— necesita {e.necesario}, tiene {e.disponible}
-                  {e.es_fabricable && (
-                    <div className="text-red-500 mt-0.5">
-                      💡 Fabricable — fabricalo primero desde Insumos
-                    </div>
-                  )}
+                  <span className="font-medium">{e.insumo}</span> — necesita {e.necesario}, tiene {e.disponible}
+                  {e.es_fabricable && <div className="text-red-500 mt-0.5">💡 Fabricable — fabricalo primero desde Insumos</div>}
                 </div>
               ))}
             </div>
           )}
 
-          {/* Advertencia preventiva */}
           {insuficientes.length > 0 && erroresInsumos.length === 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-[11px] text-amber-800">
-              ⚠️ Stock insuficiente para {cantidad} unidades. Reducí la cantidad o reabastecé los insumos en rojo.
+              ⚠️ Stock insuficiente para {cantidad} unidades.
             </div>
           )}
 
           {error && (
-            <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {error}
-            </div>
+            <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
           )}
         </div>
 
@@ -249,8 +290,7 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
             className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
             Cancelar
           </button>
-          <button
-            onClick={handleFabricar}
+          <button onClick={handleFabricar}
             disabled={fabricando || receta.length === 0 || insuficientes.length > 0}
             className="flex-1 py-2 text-xs font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed">
             {fabricando ? 'Fabricando...' : `Fabricar ${cantidad} u.`}
@@ -260,12 +300,19 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
     </div>
   )
 }
+
 // ── Página ────────────────────────────────────────────────────
 
 export default function ProductosPage() {
-  const { productos, todos, stats, loading, error, filtros, setFiltros, limpiarFiltros, recargar } = useProductos()
+  const {
+    productos, todos, stats, loading, error,
+    filtros, setFiltros, limpiarFiltros, recargar,
+    ajustarStock,
+  } = useProductos()
+
   const [vista, setVista] = useState<'lista' | 'grilla'>('lista')
   const [modalFabricar, setModalFabricar] = useState<{ id: number; nombre: string; stock: number } | null>(null)
+  const [ajusteAbierto, setAjusteAbierto] = useState<number | null>(null)
 
   const categorias = Array.from(
     new Map(todos.filter(p => p.categoria_id && p.categoria_nombre)
@@ -322,10 +369,10 @@ export default function ProductosPage() {
       {/* Métricas */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Total productos', valor: stats.total,      sub: 'en catálogo',           fmt: false },
-          { label: 'Valor en stock',  valor: stats.valorStock, sub: 'al costo',               fmt: true },
-          { label: 'Stock bajo',      valor: stats.stockBajo,  sub: 'requieren reposición',   fmt: false },
-          { label: 'Sin publicar',    valor: stats.sinPublicar, sub: 'no visibles en tienda', fmt: false },
+          { label: 'Total productos', valor: stats.total,       sub: 'en catálogo',           fmt: false },
+          { label: 'Valor en stock',  valor: stats.valorStock,  sub: 'al costo',               fmt: true },
+          { label: 'Stock bajo',      valor: stats.stockBajo,   sub: 'requieren reposición',   fmt: false },
+          { label: 'Sin publicar',    valor: stats.sinPublicar, sub: 'no visibles en tienda',  fmt: false },
         ].map(m => (
           <div key={m.label} className="bg-gray-100 rounded-lg px-4 py-3">
             <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">{m.label}</div>
@@ -421,11 +468,12 @@ export default function ProductosPage() {
                       </td>
                     </tr>
                   )
-                  : productos.map(p => {
+                  : productos.flatMap(p => {
                       const tipo = TIPO_CFG[p.tipo]
                       const stock = p.estado_stock ? STOCK_CFG[p.estado_stock] : null
-                      return (
-                        <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
+                      return [
+                        <tr key={p.id}
+                          className={`border-t border-gray-100 hover:bg-gray-50 ${ajusteAbierto === p.id ? 'bg-blue-50' : ''}`}>
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden border border-gray-200">
@@ -465,7 +513,11 @@ export default function ProductosPage() {
                           </td>
                           <td className="px-4 py-2.5">
                             <div className="flex gap-1 justify-end">
-                              {/* Botón fabricar — solo para productos propios con receta */}
+                              <button
+                                onClick={() => setAjusteAbierto(prev => prev === p.id ? null : p.id)}
+                                className="text-[11px] px-2.5 py-1 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
+                                + Stock
+                              </button>
                               {p.tipo === 'propio' && (
                                 <button
                                   onClick={() => setModalFabricar({ id: p.id, nombre: p.nombre, stock: p.stock })}
@@ -479,8 +531,16 @@ export default function ProductosPage() {
                               </Link>
                             </div>
                           </td>
-                        </tr>
-                      )
+                        </tr>,
+                        ajusteAbierto === p.id && (
+                          <PanelAjuste
+                            key={`ajuste-${p.id}`}
+                            producto={p}
+                            onAjustar={(op, cant, costo) => ajustarStock(p.id, op, cant, costo)}
+                            onCerrar={() => setAjusteAbierto(null)}
+                          />
+                        )
+                      ].filter(Boolean)
                     })
               }
             </tbody>
@@ -523,6 +583,11 @@ export default function ProductosPage() {
                       </div>
                     </div>
                     <div className="px-3 pb-3 flex gap-1 border-t border-gray-100 pt-2">
+                      <button
+                        onClick={() => { setVista('lista'); setAjusteAbierto(p.id) }}
+                        className="flex-1 text-[11px] py-1 bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
+                        + Stock
+                      </button>
                       {p.tipo === 'propio' && (
                         <button
                           onClick={() => setModalFabricar({ id: p.id, nombre: p.nombre, stock: p.stock })}

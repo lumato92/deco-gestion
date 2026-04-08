@@ -108,7 +108,47 @@ export function useProductos() {
     valorStock: todos.reduce((s, p) => s + p.stock * p.costo, 0),
   }
 
-  return { productos, todos, stats, loading, error, filtros, setFiltros, limpiarFiltros, recargar: fetchProductos }
+  // ── Ajuste de stock ───────────────────────────────────────
+  const ajustarStock = useCallback(async (
+    id: number,
+    operacion: 'entrada' | 'salida' | 'ajuste',
+    cantidad: number,
+    nuevoCosto?: number
+  ): Promise<boolean> => {
+    const supabase = createClient()
+    try {
+      const producto = todos.find(p => p.id === id)
+      if (!producto) return false
+
+      let nuevoStock: number
+      if (operacion === 'entrada') nuevoStock = producto.stock + cantidad
+      else if (operacion === 'salida') nuevoStock = Math.max(0, producto.stock - cantidad)
+      else nuevoStock = cantidad // ajuste manual = nuevo total
+
+      const update: Record<string, number> = { stock: nuevoStock }
+      if (operacion === 'entrada' && nuevoCosto !== undefined) {
+        update.costo = nuevoCosto
+      }
+
+      const { error: err } = await supabase
+        .from('productos')
+        .update(update)
+        .eq('id', id)
+
+      if (err) throw err
+      await fetchProductos()
+      return true
+    } catch {
+      return false
+    }
+  }, [todos, fetchProductos])
+
+  return {
+    productos, todos, stats, loading, error,
+    filtros, setFiltros, limpiarFiltros,
+    recargar: fetchProductos,
+    ajustarStock,
+  }
 }
 
 // ── Hook para un producto individual ─────────────────────────
@@ -139,7 +179,6 @@ export function useProducto(id: number | null) {
     cargar()
   }, [id])
 
-  // Cargar subcategorías cuando cambia la categoría
   const cargarSubcategorias = useCallback(async (categoriaId: number) => {
     const supabase = createClient()
     const { data } = await supabase
