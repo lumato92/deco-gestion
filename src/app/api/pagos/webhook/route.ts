@@ -38,8 +38,11 @@ export async function POST(req: NextRequest) {
 
     // ── Detectar si es pago del Point (sin external_reference) ─
     const externalRef = pago.external_reference
-    const esPagoPoint = !externalRef || externalRef === '' || externalRef === 'null'
-
+    const esPagoPoint = !externalRef || 
+      externalRef === '' || 
+      externalRef === 'null' ||
+      externalRef === 'Venta presencial' ||
+      (pago as any).operation_type === 'pos_payment'
     if (esPagoPoint) {
       // Guardar en pagos_point_pendientes para asignación manual
       const { error: errPoint } = await supabase
