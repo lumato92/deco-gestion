@@ -17,7 +17,7 @@ export interface ItemVenta {
 
 export interface FormVenta {
   cliente_id: number | null
-  cliente_nombre_temp: string   // para ventas sin cliente registrado
+  cliente_nombre_temp: string
   canal_venta: CanalVenta
   metodo_pago: MetodoPago
   descuento_tipo: 'pct' | 'monto'
@@ -25,6 +25,7 @@ export interface FormVenta {
   con_sena: boolean
   monto_sena: number
   notas: string
+  entrega_inmediata: boolean
   items: ItemVenta[]
 }
 
@@ -38,6 +39,7 @@ const FORM_INICIAL: FormVenta = {
   con_sena: false,
   monto_sena: 0,
   notas: '',
+  entrega_inmediata: false,
   items: [],
 }
 
@@ -120,6 +122,9 @@ export function useNuevaVenta() {
     setError(null)
     const supabase = createClient()
 
+    const ahora = new Date().toISOString()
+    const estadoInicial = form.entrega_inmediata ? 'entregado' : 'confirmado'
+
     try {
       // 1. Crear el pedido
       const { data: pedido, error: errPedido } = await supabase
@@ -127,13 +132,14 @@ export function useNuevaVenta() {
         .insert({
           cliente_id: form.cliente_id,
           origen_venta: 'directa',
-          estado: 'confirmado',
+          estado: estadoInicial,
           canal_venta: form.canal_venta,
           metodo_pago: form.metodo_pago,
           descuento_pct: Math.round(descuentoPct * 100) / 100,
           recargo_pct: recargoPct,
           notas: form.notas || null,
-          fecha_confirmacion: new Date().toISOString(),
+          fecha_confirmacion: ahora,
+          ...(form.entrega_inmediata ? { fecha_entrega: ahora } : {}),
         })
         .select('id')
         .single()
@@ -157,19 +163,19 @@ export function useNuevaVenta() {
 
       if (errItems) throw new Error(errItems.message)
 
-// 3. Registrar pago — si es MP lo omitimos, el webhook lo registra cuando se acredite
-if (form.metodo_pago !== 'mercadopago') {
-  const { error: errPago } = await supabase
-    .from('pagos_pedido')
-    .insert({
-      pedido_id: pedido.id,
-      tipo: form.con_sena ? 'seña' : 'pago_total',
-      metodo_pago: form.metodo_pago,
-      monto: form.con_sena ? form.monto_sena : total,
-    })
+      // 3. Registrar pago — si es MP lo omitimos, el webhook lo registra cuando se acredite
+      if (form.metodo_pago !== 'mercadopago') {
+        const { error: errPago } = await supabase
+          .from('pagos_pedido')
+          .insert({
+            pedido_id: pedido.id,
+            tipo: form.con_sena ? 'seña' : 'pago_total',
+            metodo_pago: form.metodo_pago,
+            monto: form.con_sena ? form.monto_sena : total,
+          })
 
-  if (errPago) throw new Error(errPago.message)
-}
+        if (errPago) throw new Error(errPago.message)
+      }
 
       // 4. Descontar stock via función de Supabase
       const { data: resultado } = await supabase

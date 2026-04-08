@@ -2,7 +2,7 @@
 
 // src/app/dashboard/ventas/nueva/page.tsx
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useNuevaVenta } from '@/hooks/use-nueva-venta'
@@ -34,8 +34,10 @@ function normalizar(str: string) {
 }
 
 // ── Modal popup de confirmación ────────────────────────────────────────────────
-function PopupExito({ total, linkMP, onNuevaVenta, onDashboard }: {
+function PopupExito({ total, pedidoId, entregaInmediata, linkMP, onNuevaVenta, onDashboard }: {
   total: number
+  pedidoId: number
+  entregaInmediata: boolean
   linkMP?: string
   onNuevaVenta: () => void
   onDashboard: () => void
@@ -52,11 +54,15 @@ function PopupExito({ total, linkMP, onNuevaVenta, onDashboard }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl border border-gray-200 p-8 w-full max-w-sm text-center flex flex-col items-center gap-4">
+
+        {/* Ícono */}
         <div className="w-14 h-14 rounded-full bg-teal-100 flex items-center justify-center">
           <svg className="w-7 h-7 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
+
+        {/* Título */}
         <div>
           <h2 className="text-base font-medium text-gray-900">Venta registrada</h2>
           <p className="text-sm text-gray-400 mt-1">
@@ -64,6 +70,7 @@ function PopupExito({ total, linkMP, onNuevaVenta, onDashboard }: {
           </p>
         </div>
 
+        {/* Link MP si corresponde */}
         {linkMP && (
           <div className="w-full flex flex-col gap-2">
             <p className="text-[12px] text-gray-500 text-left">
@@ -93,6 +100,32 @@ function PopupExito({ total, linkMP, onNuevaVenta, onDashboard }: {
           </div>
         )}
 
+        {/* Accesos rápidos a documentos si fue entrega inmediata */}
+        {entregaInmediata && (
+          <div className="w-full flex flex-col gap-2">
+            <p className="text-[12px] text-gray-500 text-left">Documentos disponibles</p>
+            <div className="flex gap-2">
+              <a
+                href={`/api/pdf/ticket?id=${pedidoId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 py-2 text-[12px] font-medium text-center bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+              >
+                Ticket de caja
+              </a>
+              <a
+                href={`/api/pdf/remito?id=${pedidoId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 py-2 text-[12px] font-medium text-center border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
+              >
+                Remito
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Acciones */}
         <div className="flex gap-3 w-full">
           <button
             onClick={onNuevaVenta}
@@ -228,6 +261,8 @@ export default function NuevaVentaPage() {
 
   const [ventaConfirmada, setVentaConfirmada] = useState(false)
   const [totalConfirmado, setTotalConfirmado] = useState(0)
+  const [pedidoIdConfirmado, setPedidoIdConfirmado] = useState(0)
+  const [entregaInmediataConfirmada, setEntregaInmediataConfirmada] = useState(false)
   const [linkMP, setLinkMP] = useState<string | undefined>(undefined)
 
   // Cargar productos al montar
@@ -250,7 +285,7 @@ export default function NuevaVentaPage() {
       .then(({ data }) => setTodosClientes(data ?? []))
   }, [])
 
-  // Filtrar productos localmente (sin acentos, case insensitive)
+  // Filtrar productos localmente
   useEffect(() => {
     if (busquedaProd.length < 2) { setResultadosProd([]); return }
     const q = normalizar(busquedaProd)
@@ -288,11 +323,14 @@ export default function NuevaVentaPage() {
   const handleConfirmar = async () => {
     const montoFinal = total
     const esMercadoPago = form.metodo_pago === 'mercadopago'
+    const fueEntregaInmediata = form.entrega_inmediata
 
     const pedidoId = await confirmarVenta()
     if (pedidoId === false) return
 
     setTotalConfirmado(montoFinal)
+    setPedidoIdConfirmado(pedidoId)
+    setEntregaInmediataConfirmada(fueEntregaInmediata)
 
     if (esMercadoPago) {
       try {
@@ -308,10 +346,9 @@ export default function NuevaVentaPage() {
         })
         const data = await res.json()
         if (data.link) setLinkMP(data.link)
-      } catch (e: any) {
-  console.error('Error generando link MP:', e)
-  alert('Error generando link: ' + (e?.message ?? 'desconocido'))
-}
+      } catch {
+        // si falla el link igual mostramos el popup de éxito
+      }
     }
 
     setVentaConfirmada(true)
@@ -324,6 +361,8 @@ export default function NuevaVentaPage() {
       {ventaConfirmada && (
         <PopupExito
           total={totalConfirmado}
+          pedidoId={pedidoIdConfirmado}
+          entregaInmediata={entregaInmediataConfirmada}
           linkMP={linkMP}
           onNuevaVenta={() => {
             resetForm()
@@ -331,6 +370,7 @@ export default function NuevaVentaPage() {
             setClienteSeleccionado(null)
             setMostrarCliente(false)
             setLinkMP(undefined)
+            setEntregaInmediataConfirmada(false)
           }}
           onDashboard={() => router.push('/dashboard')}
         />
@@ -596,6 +636,39 @@ export default function NuevaVentaPage() {
             )}
           </div>
 
+          {/* Entrega */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="text-[13px] font-medium text-gray-900 mb-3">Entrega</div>
+
+            {/* Entrega inmediata — oculto si es MP */}
+            {form.metodo_pago !== 'mercadopago' && (
+              <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                form.entrega_inmediata
+                  ? 'border-teal-500 bg-teal-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={form.entrega_inmediata}
+                  onChange={e => setForm({ entrega_inmediata: e.target.checked })}
+                  className="mt-0.5 rounded"
+                />
+                <div>
+                  <div className="text-[13px] font-medium text-gray-900">Entrega inmediata</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">
+                    El cliente retira en este momento — genera ticket disponible al confirmar
+                  </div>
+                </div>
+              </label>
+            )}
+
+            {form.metodo_pago === 'mercadopago' && (
+              <p className="text-[12px] text-gray-400">
+                Para ventas con Mercado Pago la entrega se confirma cuando se acredita el pago.
+              </p>
+            )}
+          </div>
+
           {/* Totales */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
@@ -632,7 +705,9 @@ export default function NuevaVentaPage() {
                 ? 'Registrando...'
                 : form.metodo_pago === 'mercadopago'
                   ? `Confirmar y generar link · ${formatMonto(total)}`
-                  : `Confirmar venta · ${formatMonto(total)}`
+                  : form.entrega_inmediata
+                    ? `Confirmar entrega · ${formatMonto(total)}`
+                    : `Confirmar venta · ${formatMonto(total)}`
               }
             </button>
             <button onClick={() => router.push('/dashboard/ventas/presupuestos/nuevo')}
