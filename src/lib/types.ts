@@ -86,6 +86,7 @@ export interface PedidoConTotal {
   ganancia: number
   cobrado: number
   pendiente: number
+  mp_link?: string
 }
 
 export interface ItemPedido {
