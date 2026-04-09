@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     if (errPago) throw new Error(errPago.message)
 
     const { data: pedido } = await supabase
-      .from('pedidos_con_total'
+      .from('pedidos_con_total')
       .select('pendiente')
       .eq('id', pedidoId)
       .single()
