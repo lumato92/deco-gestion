@@ -14,6 +14,17 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
 
+    //TESTEO LOGING
+    console.log('Webhook recibido:', JSON.stringify(body))
+    console.log('Query params:', req.nextUrl.searchParams.toString())
+    if (body.type !== 'payment') {
+    console.log('Ignorando tipo:', body.type)
+    return NextResponse.json({ ok: true })
+
+    }
+
+    // FIN TESTEO
+    
     // ── Notificación del Point ─────────────────────────────────
     if (body.type === 'point_integration_wh') {
       const intentId = body.data?.id
