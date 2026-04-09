@@ -2,7 +2,7 @@
 
 // src/app/dashboard/ventas/nueva/page.tsx
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useNuevaVenta } from '@/hooks/use-nueva-venta'
@@ -263,7 +263,7 @@ function FormProductoLibre({ onAgregar, onCancelar }: {
 }
 
 // ── Página ─────────────────────────────────────────────────────────────────────
-export default function NuevaVentaPage() {
+function NuevaVentaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const desdePoint = searchParams.get('desde') === 'point'
@@ -830,5 +830,13 @@ export default function NuevaVentaPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function NuevaVentaPage() {
+  return (
+    <Suspense fallback={<div className="p-5 text-xs text-gray-400">Cargando...</div>}>
+      <NuevaVentaContent />
+    </Suspense>
   )
 }
