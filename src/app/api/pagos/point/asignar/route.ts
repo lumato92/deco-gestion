@@ -1,7 +1,7 @@
 // src/app/api/pagos/point/asignar/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/client'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Faltan parámetros' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = createClient()
 
     // Traemos el pago Point pendiente
     const { data: pagoPoint, error: errGet } = await supabase
