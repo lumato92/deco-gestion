@@ -3,6 +3,7 @@
 // src/components/ventas/banner-pagos-point.tsx
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { formatMonto, formatFecha } from '@/lib/utils'
 
@@ -23,19 +24,32 @@ interface PedidoBasico {
   cliente_nombre: string | null
   total_cobrado: number
   pendiente: number
+  fecha_pedido: string
 }
 
 function normalizar(str: string) {
   return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
-// ── Modal para asignar un pago Point a un pedido ──────────────
+const medioLabel: Record<string, string> = {
+  debit_card:   'Débito',
+  credit_card:  'Crédito',
+  prepaid_card: 'Prepaga',
+  debvisa:      'Visa débito',
+  debmaster:    'Master débito',
+  visa:         'Visa crédito',
+  master:       'Master crédito',
+  amex:         'Amex crédito',
+}
+
+// ── Modal para asignar un pago Point ─────────────────────────
 
 function ModalAsignar({ pago, onAsignado, onCerrar }: {
   pago: PagoPoint
   onAsignado: () => void
   onCerrar: () => void
 }) {
+  const router = useRouter()
   const [busqueda, setBusqueda] = useState('')
   const [pedidos, setPedidos] = useState<PedidoBasico[]>([])
   const [resultados, setResultados] = useState<PedidoBasico[]>([])
@@ -43,13 +57,12 @@ function ModalAsignar({ pago, onAsignado, onCerrar }: {
   const [asignando, setAsignando] = useState(false)
   const [error, setError] = useState('')
 
-  // Cargar pedidos con saldo pendiente
+  // Cargamos TODOS los pedidos recientes — pendientes y cobrados
   useEffect(() => {
     const supabase = createClient()
     supabase
       .from('pedidos_con_total')
-      .select('id, cliente_nombre, total_cobrado, pendiente')
-      .gt('pendiente', 0)
+      .select('id, cliente_nombre, total_cobrado, pendiente, fecha_pedido')
       .not('estado', 'in', '("cancelado","presupuesto")')
       .order('fecha_pedido', { ascending: false })
       .limit(100)
@@ -69,6 +82,13 @@ function ModalAsignar({ pago, onAsignado, onCerrar }: {
       ).slice(0, 8)
     )
   }, [busqueda, pedidos])
+
+  // Diferencia entre lo cobrado por el Point y el total del pedido
+  const diferencia = pedidoSeleccionado
+    ? pago.monto - pedidoSeleccionado.total_cobrado
+    : 0
+  const tolerancia = 5 // pesos de tolerancia por redondeo
+  const coincide = Math.abs(diferencia) <= tolerancia
 
   const handleAsignar = async () => {
     if (!pedidoSeleccionado) { setError('Seleccioná un pedido'); return }
@@ -93,10 +113,16 @@ function ModalAsignar({ pago, onAsignado, onCerrar }: {
     }
   }
 
-  const medioLabel: Record<string, string> = {
-    debit_card:  'Débito',
-    credit_card: 'Crédito',
-    prepaid_card: 'Prepaga',
+  const handleCrearVenta = () => {
+    // Guardamos el pago Point en sessionStorage para asignarlo al volver
+    sessionStorage.setItem('point_pago_pendiente', JSON.stringify({
+      mp_pago_id: pago.mp_pago_id,
+      monto: pago.monto,
+      medio: pago.medio,
+      cuotas: pago.cuotas,
+    }))
+    onCerrar()
+    router.push('/dashboard/ventas/nueva?desde=point')
   }
 
   return (
@@ -107,14 +133,14 @@ function ModalAsignar({ pago, onAsignado, onCerrar }: {
         <div>
           <h3 className="text-sm font-medium text-gray-900">Asignar pago Point</h3>
           <p className="text-xs text-gray-400 mt-0.5">
-            Seleccioná el pedido al que corresponde este cobro
+            Buscá el pedido correspondiente o creá una venta nueva
           </p>
         </div>
 
         {/* Detalle del pago */}
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 flex flex-col gap-2">
           <div className="flex justify-between text-[12px]">
-            <span className="text-gray-500">Monto cobrado</span>
+            <span className="text-gray-500">Monto cobrado por Point</span>
             <span className="font-medium text-gray-900">{formatMonto(pago.monto)}</span>
           </div>
           <div className="flex justify-between text-[12px]">
@@ -122,7 +148,7 @@ function ModalAsignar({ pago, onAsignado, onCerrar }: {
             <span className="text-red-600">— {formatMonto(pago.comisiones)}</span>
           </div>
           <div className="flex justify-between text-[12px] pt-1.5 border-t border-gray-200">
-            <span className="text-gray-700 font-medium">Neto a acreditar</span>
+            <span className="text-gray-700 font-medium">Neto acreditado</span>
             <span className="font-medium text-teal-700">{formatMonto(pago.monto_neto)}</span>
           </div>
           <div className="flex justify-between text-[11px] text-gray-400 pt-1">
@@ -137,24 +163,52 @@ function ModalAsignar({ pago, onAsignado, onCerrar }: {
         {/* Buscador de pedidos */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[11px] text-gray-500 uppercase tracking-wide">
-            Buscar pedido (cliente o #)
+            Buscar pedido existente
           </label>
           {pedidoSeleccionado ? (
-            <div className="flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2.5">
-              <div className="flex-1">
-                <div className="text-[13px] font-medium text-gray-900">
-                  #{pedidoSeleccionado.id} — {pedidoSeleccionado.cliente_nombre ?? '(sin cliente)'}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2.5">
+                <div className="flex-1">
+                  <div className="text-[13px] font-medium text-gray-900">
+                    #{pedidoSeleccionado.id} — {pedidoSeleccionado.cliente_nombre ?? '(sin cliente)'}
+                  </div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">
+                    Total venta: {formatMonto(pedidoSeleccionado.total_cobrado)}
+                    {pedidoSeleccionado.pendiente > 0 && (
+                      <span className="ml-2 text-amber-600">· Pendiente: {formatMonto(pedidoSeleccionado.pendiente)}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="text-[11px] text-gray-500 mt-0.5">
-                  Pendiente: {formatMonto(pedidoSeleccionado.pendiente)}
-                </div>
+                <button
+                  onClick={() => setPedidoSeleccionado(null)}
+                  className="text-[11px] text-gray-400 hover:text-gray-600"
+                >
+                  Cambiar
+                </button>
               </div>
-              <button
-                onClick={() => setPedidoSeleccionado(null)}
-                className="text-[11px] text-gray-400 hover:text-gray-600"
-              >
-                Cambiar
-              </button>
+
+              {/* Comparación de montos */}
+              {coincide ? (
+                <div className="flex items-center gap-2 text-[11px] text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                  <span>✓</span>
+                  <span>Los montos coinciden — todo OK</span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <div className="text-[11px] font-medium text-amber-800">
+                    Diferencia de {formatMonto(Math.abs(diferencia))}
+                  </div>
+                  <div className="text-[11px] text-amber-700">
+                    {diferencia > 0
+                      ? `El Point cobró ${formatMonto(diferencia)} más que el total de la venta (recargo tarjeta aplicado en Point)`
+                      : `El Point cobró ${formatMonto(Math.abs(diferencia))} menos que el total de la venta`
+                    }
+                  </div>
+                  <div className="text-[11px] text-amber-600 mt-0.5">
+                    Podés asignar igual — el sistema registra el pago real del Point.
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="relative">
@@ -179,11 +233,19 @@ function ModalAsignar({ pago, onAsignado, onCerrar }: {
                           #{p.id} — {p.cliente_nombre ?? '(sin cliente)'}
                         </div>
                         <div className="text-[11px] text-gray-400">
-                          Pendiente: {formatMonto(p.pendiente)}
+                          Total: {formatMonto(p.total_cobrado)}
+                          {p.pendiente > 0
+                            ? <span className="ml-2 text-amber-600">· Pendiente: {formatMonto(p.pendiente)}</span>
+                            : <span className="ml-2 text-teal-600">· Cobrado</span>
+                          }
                         </div>
                       </div>
-                      <div className="text-[11px] text-gray-500 flex-shrink-0 ml-3">
-                        {formatMonto(p.total_cobrado)}
+                      <div className={`text-[11px] flex-shrink-0 ml-3 font-medium ${
+                        Math.abs(pago.monto - p.total_cobrado) <= tolerancia
+                          ? 'text-teal-600'
+                          : 'text-gray-400'
+                      }`}>
+                        {Math.abs(pago.monto - p.total_cobrado) <= tolerancia ? '✓ coincide' : formatMonto(p.total_cobrado)}
                       </div>
                     </button>
                   ))}
@@ -192,6 +254,21 @@ function ModalAsignar({ pago, onAsignado, onCerrar }: {
             </div>
           )}
         </div>
+
+        {/* Separador con "o" */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-[11px] text-gray-400">o</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        {/* Crear venta nueva */}
+        <button
+          onClick={handleCrearVenta}
+          className="w-full py-2.5 text-[12px] font-medium border-2 border-dashed border-teal-300 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors"
+        >
+          + Crear venta nueva para este pago
+        </button>
 
         {error && <p className="text-[11px] text-red-600">{error}</p>}
 
@@ -236,12 +313,6 @@ export function BannerPagosPoint({ onAsignado }: { onAsignado: () => void }) {
 
   if (pagos.length === 0) return null
 
-  const medioLabel: Record<string, string> = {
-    debit_card:   'Débito',
-    credit_card:  'Crédito',
-    prepaid_card: 'Prepaga',
-  }
-
   return (
     <>
       {modalPago && (
@@ -253,7 +324,6 @@ export function BannerPagosPoint({ onAsignado }: { onAsignado: () => void }) {
       )}
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
-        {/* Header del banner */}
         <button
           onClick={() => setExpandido(prev => !prev)}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-amber-100 transition-colors"
@@ -272,7 +342,6 @@ export function BannerPagosPoint({ onAsignado }: { onAsignado: () => void }) {
           </span>
         </button>
 
-        {/* Lista expandida */}
         {expandido && (
           <div className="border-t border-amber-200">
             {pagos.map(pago => (

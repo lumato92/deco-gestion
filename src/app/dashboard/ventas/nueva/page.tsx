@@ -3,7 +3,7 @@
 // src/app/dashboard/ventas/nueva/page.tsx
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useNuevaVenta } from '@/hooks/use-nueva-venta'
 import { formatMonto } from '@/lib/utils'
@@ -25,20 +25,24 @@ interface ClienteBuscado {
   canal: string
 }
 
-// ── Normalizar texto para búsqueda sin acentos y case insensitive ─────────────
+interface PagoPointPendiente {
+  mp_pago_id: string
+  monto: number
+  medio: string | null
+  cuotas: number
+}
+
 function normalizar(str: string) {
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 // ── Modal popup de confirmación ────────────────────────────────────────────────
-function PopupExito({ total, pedidoId, entregaInmediata, linkMP, onNuevaVenta, onDashboard }: {
+function PopupExito({ total, pedidoId, entregaInmediata, linkMP, pagoPointAsignado, onNuevaVenta, onDashboard }: {
   total: number
   pedidoId: number
   entregaInmediata: boolean
   linkMP?: string
+  pagoPointAsignado?: boolean
   onNuevaVenta: () => void
   onDashboard: () => void
 }) {
@@ -66,21 +70,22 @@ function PopupExito({ total, pedidoId, entregaInmediata, linkMP, onNuevaVenta, o
           </p>
         </div>
 
+        {pagoPointAsignado && (
+          <div className="w-full bg-teal-50 border border-teal-200 rounded-lg px-3 py-2.5 text-[12px] text-teal-800">
+            ✓ Pago del Point asignado a esta venta
+          </div>
+        )}
+
         {linkMP && (
           <div className="w-full flex flex-col gap-2">
             <p className="text-[12px] text-gray-500 text-left">
               Link de pago generado — compartilo con el cliente
             </p>
             <div className="flex gap-2">
-              <input
-                readOnly
-                value={linkMP}
-                className="flex-1 text-[11px] bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 truncate"
-              />
-              <button
-                onClick={copiarLink}
-                className="px-3 py-1.5 text-[11px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap"
-              >
+              <input readOnly value={linkMP}
+                className="flex-1 text-[11px] bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 text-gray-600 truncate" />
+              <button onClick={copiarLink}
+                className="px-3 py-1.5 text-[11px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 whitespace-nowrap">
                 {copiado ? '✓ Copiado' : 'Copiar'}
               </button>
             </div>
@@ -231,48 +236,25 @@ function FormProductoLibre({ onAgregar, onCancelar }: {
         <span className="text-[11px] font-medium text-purple-700 uppercase tracking-wide">Producto libre</span>
         <span className="text-[10px] text-purple-400">sin stock ni catálogo</span>
       </div>
-      <input
-        type="text"
-        placeholder="Nombre del producto o servicio..."
-        value={nombre}
-        onChange={e => { setNombre(e.target.value); setError('') }}
-        autoFocus
-        className="text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400"
-      />
+      <input type="text" placeholder="Nombre del producto o servicio..."
+        value={nombre} onChange={e => { setNombre(e.target.value); setError('') }} autoFocus
+        className="text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400" />
       <div className="flex gap-2">
-        <div className="flex-1">
-          <input
-            type="number"
-            placeholder="Precio unitario"
-            min={0}
-            value={precio}
-            onChange={e => { setPrecio(e.target.value === '' ? '' : Number(e.target.value)); setError('') }}
-            className="w-full text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400"
-          />
-        </div>
-        <div className="w-20">
-          <input
-            type="number"
-            placeholder="Cant."
-            min={1}
-            value={cantidad}
-            onChange={e => setCantidad(Math.max(1, Number(e.target.value)))}
-            className="w-full text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 text-center focus:outline-none focus:border-purple-400"
-          />
-        </div>
+        <input type="number" placeholder="Precio unitario" min={0} value={precio}
+          onChange={e => { setPrecio(e.target.value === '' ? '' : Number(e.target.value)); setError('') }}
+          className="flex-1 text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400" />
+        <input type="number" placeholder="Cant." min={1} value={cantidad}
+          onChange={e => setCantidad(Math.max(1, Number(e.target.value)))}
+          className="w-20 text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 text-center focus:outline-none focus:border-purple-400" />
       </div>
       {error && <p className="text-[11px] text-red-600">{error}</p>}
       <div className="flex gap-2">
-        <button
-          onClick={onCancelar}
-          className="flex-1 py-1.5 text-[12px] border border-gray-200 rounded-lg text-gray-500 hover:bg-white"
-        >
+        <button onClick={onCancelar}
+          className="flex-1 py-1.5 text-[12px] border border-gray-200 rounded-lg text-gray-500 hover:bg-white">
           Cancelar
         </button>
-        <button
-          onClick={handleAgregar}
-          className="flex-1 py-1.5 text-[12px] font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-        >
+        <button onClick={handleAgregar}
+          className="flex-1 py-1.5 text-[12px] font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700">
           Agregar
         </button>
       </div>
@@ -283,6 +265,9 @@ function FormProductoLibre({ onAgregar, onCancelar }: {
 // ── Página ─────────────────────────────────────────────────────────────────────
 export default function NuevaVentaPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const desdePoint = searchParams.get('desde') === 'point'
+
   const {
     form, setForm, resetForm,
     agregarItem, quitarItem, actualizarItem,
@@ -307,6 +292,21 @@ export default function NuevaVentaPage() {
   const [pedidoIdConfirmado, setPedidoIdConfirmado] = useState(0)
   const [entregaInmediataConfirmada, setEntregaInmediataConfirmada] = useState(false)
   const [linkMP, setLinkMP] = useState<string | undefined>(undefined)
+  const [pagoPointAsignado, setPagoPointAsignado] = useState(false)
+
+  // Leer pago Point pendiente del sessionStorage
+  const [pagoPoint, setPagoPoint] = useState<PagoPointPendiente | null>(null)
+
+  useEffect(() => {
+    if (desdePoint) {
+      const stored = sessionStorage.getItem('point_pago_pendiente')
+      if (stored) {
+        try {
+          setPagoPoint(JSON.parse(stored))
+        } catch {}
+      }
+    }
+  }, [desdePoint])
 
   // Cargar productos al montar
   useEffect(() => {
@@ -332,9 +332,7 @@ export default function NuevaVentaPage() {
   useEffect(() => {
     if (busquedaProd.length < 2) { setResultadosProd([]); return }
     const q = normalizar(busquedaProd)
-    setResultadosProd(
-      todosProds.filter(p => normalizar(p.nombre).includes(q)).slice(0, 8)
-    )
+    setResultadosProd(todosProds.filter(p => normalizar(p.nombre).includes(q)).slice(0, 8))
   }, [busquedaProd, todosProds])
 
   // Filtrar clientes localmente
@@ -343,8 +341,7 @@ export default function NuevaVentaPage() {
     const q = normalizar(busquedaCli)
     setResultadosCli(
       todosClientes.filter(c =>
-        normalizar(c.nombre).includes(q) ||
-        (c.telefono ?? '').includes(q)
+        normalizar(c.nombre).includes(q) || (c.telefono ?? '').includes(q)
       ).slice(0, 6)
     )
   }, [busquedaCli, todosClientes])
@@ -364,14 +361,7 @@ export default function NuevaVentaPage() {
   }
 
   const agregarProductoLibre = (nombre: string, precio: number, cantidad: number) => {
-    agregarItem({
-      producto_id: null,
-      nombre_producto: nombre,
-      cantidad,
-      precio_unitario: precio,
-      costo_unitario: 0,
-      requiere_fabricacion: false,
-    })
+    agregarItem({ producto_id: null, nombre_producto: nombre, cantidad, precio_unitario: precio, costo_unitario: 0, requiere_fabricacion: false })
     setMostrarFormLibre(false)
   }
 
@@ -387,6 +377,26 @@ export default function NuevaVentaPage() {
     setPedidoIdConfirmado(pedidoId)
     setEntregaInmediataConfirmada(fueEntregaInmediata)
 
+    // Si venimos desde Point, asignamos el pago automáticamente
+    if (pagoPoint) {
+      try {
+        const res = await fetch('/api/pagos/point/asignar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mp_pago_id: pagoPoint.mp_pago_id,
+            pedido_id: pedidoId,
+          }),
+        })
+        if (res.ok) {
+          sessionStorage.removeItem('point_pago_pendiente')
+          setPagoPointAsignado(true)
+        }
+      } catch {
+        // Si falla la asignación igual mostramos el popup
+      }
+    }
+
     if (esMercadoPago) {
       try {
         const res = await fetch('/api/pagos/link', {
@@ -401,12 +411,16 @@ export default function NuevaVentaPage() {
         })
         const data = await res.json()
         if (data.link) setLinkMP(data.link)
-      } catch {
-        // si falla el link igual mostramos el popup de éxito
-      }
+      } catch {}
     }
 
     setVentaConfirmada(true)
+  }
+
+  const medioLabel: Record<string, string> = {
+    debit_card: 'Débito', credit_card: 'Crédito', prepaid_card: 'Prepaga',
+    debvisa: 'Visa débito', debmaster: 'Master débito',
+    visa: 'Visa crédito', master: 'Master crédito', amex: 'Amex',
   }
 
   return (
@@ -419,6 +433,7 @@ export default function NuevaVentaPage() {
           pedidoId={pedidoIdConfirmado}
           entregaInmediata={entregaInmediataConfirmada}
           linkMP={linkMP}
+          pagoPointAsignado={pagoPointAsignado}
           onNuevaVenta={() => {
             resetForm()
             setVentaConfirmada(false)
@@ -426,6 +441,8 @@ export default function NuevaVentaPage() {
             setMostrarCliente(false)
             setLinkMP(undefined)
             setEntregaInmediataConfirmada(false)
+            setPagoPointAsignado(false)
+            setPagoPoint(null)
           }}
           onDashboard={() => router.push('/dashboard')}
         />
@@ -451,6 +468,27 @@ export default function NuevaVentaPage() {
         </button>
       </div>
 
+      {/* Banner pago Point si venimos desde ahí */}
+      {pagoPoint && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-amber-500" />
+            <div>
+              <span className="text-[13px] font-medium text-amber-900">
+                Pago Point a asignar: {formatMonto(pagoPoint.monto)}
+              </span>
+              <span className="ml-2 text-[12px] text-amber-700">
+                · {pagoPoint.medio ? (medioLabel[pagoPoint.medio] ?? pagoPoint.medio) : '—'}
+                {pagoPoint.cuotas > 1 ? ` · ${pagoPoint.cuotas} cuotas` : ''}
+              </span>
+            </div>
+          </div>
+          <span className="text-[11px] text-amber-600">
+            Se asignará al confirmar la venta
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-[1fr_320px] gap-4 items-start">
 
         {/* COLUMNA IZQUIERDA */}
@@ -461,23 +499,17 @@ export default function NuevaVentaPage() {
             <div className="flex items-center justify-between mb-3">
               <div className="text-[13px] font-medium text-gray-900">Productos</div>
               {!mostrarFormLibre && (
-                <button
-                  onClick={() => setMostrarFormLibre(true)}
-                  className="text-[11px] text-purple-600 font-medium hover:underline"
-                >
+                <button onClick={() => setMostrarFormLibre(true)}
+                  className="text-[11px] text-purple-600 font-medium hover:underline">
                   + Producto libre
                 </button>
               )}
             </div>
 
             <div className="relative mb-3">
-              <input
-                type="text"
-                placeholder="Buscar producto por nombre..."
-                value={busquedaProd}
-                onChange={e => setBusquedaProd(e.target.value)}
-                className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
-              />
+              <input type="text" placeholder="Buscar producto por nombre..."
+                value={busquedaProd} onChange={e => setBusquedaProd(e.target.value)}
+                className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
               {resultadosProd.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-sm z-10 overflow-hidden">
                   {resultadosProd.map(p => (
@@ -503,7 +535,6 @@ export default function NuevaVentaPage() {
               )}
             </div>
 
-            {/* Formulario producto libre */}
             {mostrarFormLibre && (
               <FormProductoLibre
                 onAgregar={agregarProductoLibre}
@@ -511,7 +542,6 @@ export default function NuevaVentaPage() {
               />
             )}
 
-            {/* Tabla de items */}
             {form.items.length === 0 ? (
               <div className="text-center py-6 text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg">
                 Buscá un producto para agregarlo
@@ -535,9 +565,7 @@ export default function NuevaVentaPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-gray-900">{item.nombre_producto}</span>
                             {item.producto_id === null && (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                                libre
-                              </span>
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">libre</span>
                             )}
                           </div>
                         </td>
@@ -562,7 +590,6 @@ export default function NuevaVentaPage() {
                   </tbody>
                 </table>
 
-                {/* Descuento */}
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                   <span className="text-[12px] text-gray-600">Descuento</span>
                   <div className="flex items-center gap-2">
@@ -692,7 +719,7 @@ export default function NuevaVentaPage() {
             {form.metodo_pago === 'mercadopago' && (
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <p className="text-[11px] text-blue-600 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                  Se generará un link de pago al confirmar la venta. El pedido se marcará como cobrado automáticamente cuando el cliente pague.
+                  Se generará un link de pago al confirmar la venta.
                 </p>
               </div>
             )}
@@ -722,16 +749,11 @@ export default function NuevaVentaPage() {
             <div className="text-[13px] font-medium text-gray-900 mb-3">Entrega</div>
             {form.metodo_pago !== 'mercadopago' ? (
               <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                form.entrega_inmediata
-                  ? 'border-teal-500 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                form.entrega_inmediata ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
               }`}>
-                <input
-                  type="checkbox"
-                  checked={form.entrega_inmediata}
+                <input type="checkbox" checked={form.entrega_inmediata}
                   onChange={e => setForm({ entrega_inmediata: e.target.checked })}
-                  className="mt-0.5 rounded"
-                />
+                  className="mt-0.5 rounded" />
                 <div>
                   <div className="text-[13px] font-medium text-gray-900">Entrega inmediata</div>
                   <div className="text-[11px] text-gray-400 mt-0.5">
@@ -765,6 +787,17 @@ export default function NuevaVentaPage() {
                   <span className="font-medium text-amber-700">+ {formatMonto(recargoMonto)}</span>
                 </div>
               )}
+
+              {/* Si venimos desde Point, mostramos comparación */}
+              {pagoPoint && total > 0 && (
+                <div className={`flex justify-between text-[12px] pt-1.5 border-t border-gray-100 ${
+                  Math.abs(pagoPoint.monto - total) <= 5 ? 'text-teal-600' : 'text-amber-600'
+                }`}>
+                  <span>Point cobró</span>
+                  <span className="font-medium">{formatMonto(pagoPoint.monto)}</span>
+                </div>
+              )}
+
               <div className="flex justify-between pt-2 border-t border-gray-100">
                 <span className="text-[14px] font-medium text-gray-900">Total a cobrar</span>
                 <span className="text-[18px] font-medium text-gray-900">{formatMonto(total)}</span>
@@ -784,7 +817,9 @@ export default function NuevaVentaPage() {
                   ? `Confirmar y generar link · ${formatMonto(total)}`
                   : form.entrega_inmediata
                     ? `Confirmar entrega · ${formatMonto(total)}`
-                    : `Confirmar venta · ${formatMonto(total)}`
+                    : pagoPoint
+                      ? `Confirmar y asignar pago Point · ${formatMonto(total)}`
+                      : `Confirmar venta · ${formatMonto(total)}`
               }
             </button>
             <button onClick={() => router.push('/dashboard/ventas/presupuestos/nuevo')}
