@@ -29,6 +29,7 @@ export interface PagoCompra {
 
 export interface Compra {
   id: number
+  numero_oc: string | null
   proveedor_id: number | null
   proveedor_nombre: string | null
   fecha: string
@@ -51,7 +52,6 @@ export interface FiltrosCompras {
   busqueda: string
   estado: string
   estado_pago: string
-  tipo: string
   desde: string
   hasta: string
 }
@@ -60,12 +60,11 @@ const FILTROS_INICIALES: FiltrosCompras = {
   busqueda: '',
   estado: '',
   estado_pago: '',
-  tipo: '',
   desde: '',
   hasta: '',
 }
 
-export function useCompras() {
+export function useCompras(soloTipo?: 'directa' | 'pedido') {
   const [todas, setTodas] = useState<Compra[]>([])
   const [filtros, setFiltrosState] = useState<FiltrosCompras>(FILTROS_INICIALES)
   const [loading, setLoading] = useState(true)
@@ -74,15 +73,19 @@ export function useCompras() {
   const fetchCompras = useCallback(async () => {
     const supabase = createClient()
     setLoading(true)
-    const { data, error: err } = await supabase
+    let query = supabase
       .from('compras_con_total')
       .select('*')
       .order('fecha', { ascending: false })
       .order('created_at', { ascending: false })
+
+    if (soloTipo) query = query.eq('tipo', soloTipo)
+
+    const { data, error: err } = await query
     if (err) setError('Error al cargar compras')
     else setTodas(data ?? [])
     setLoading(false)
-  }, [])
+  }, [soloTipo])
 
   useEffect(() => { fetchCompras() }, [fetchCompras])
 
@@ -92,29 +95,27 @@ export function useCompras() {
 
   const limpiarFiltros = useCallback(() => setFiltrosState(FILTROS_INICIALES), [])
 
-  // Filtrado local
   const compras = todas.filter(c => {
     if (filtros.busqueda) {
       const q = filtros.busqueda.toLowerCase()
       if (
         !c.proveedor_nombre?.toLowerCase().includes(q) &&
         !String(c.id).includes(q) &&
+        !c.numero_oc?.toLowerCase().includes(q) &&
         !c.numero_factura?.toLowerCase().includes(q) &&
         !c.numero_remito?.toLowerCase().includes(q)
       ) return false
     }
     if (filtros.estado && c.estado !== filtros.estado) return false
     if (filtros.estado_pago && c.estado_pago !== filtros.estado_pago) return false
-    if (filtros.tipo && c.tipo !== filtros.tipo) return false
     if (filtros.desde && c.fecha < filtros.desde) return false
     if (filtros.hasta && c.fecha > filtros.hasta) return false
     return true
   })
 
-  // Stats
   const stats = {
     total: todas.length,
-    pendientes: todas.filter(c => c.estado === 'pendiente' || c.estado === 'borrador').length,
+    pendientes: todas.filter(c => c.estado === 'pendiente').length,
     sinPagar: todas.filter(c => c.estado_pago === 'pendiente').length,
     montoMes: todas
       .filter(c => {
@@ -124,7 +125,7 @@ export function useCompras() {
       .reduce((s, c) => s + c.total_lineas, 0),
   }
 
-  // Guardar compra completa
+  // ── Guardar compra/pedido completo ────────────────────────
   const guardarCompra = useCallback(async (
     datos: Partial<Compra>,
     lineas: LineaCompra[],
@@ -136,13 +137,11 @@ export function useCompras() {
       let compraId = id
 
       if (id) {
-        // Actualizar
         const { error: errUpdate } = await supabase
           .from('compras')
           .update({
             proveedor_id: datos.proveedor_id ?? null,
             fecha: datos.fecha,
-            tipo: datos.tipo,
             estado: datos.estado,
             metodo_pago: datos.metodo_pago ?? null,
             estado_pago: datos.estado_pago,
@@ -153,11 +152,9 @@ export function useCompras() {
           .eq('id', id)
         if (errUpdate) throw errUpdate
 
-        // Borrar líneas y pagos anteriores para reemplazar
         await supabase.from('lineas_compra').delete().eq('compra_id', id)
         await supabase.from('pagos_compra').delete().eq('compra_id', id)
       } else {
-        // Crear
         const { data: nueva, error: errInsert } = await supabase
           .from('compras')
           .insert({
@@ -177,9 +174,8 @@ export function useCompras() {
         compraId = nueva.id
       }
 
-      if (!compraId) throw new Error('No se obtuvo ID de compra')
+      if (!compraId) throw new Error('No se obtuvo ID')
 
-      // Insertar líneas
       if (lineas.length > 0) {
         const { error: errLineas } = await supabase.from('lineas_compra').insert(
           lineas.map(l => ({
@@ -196,7 +192,6 @@ export function useCompras() {
         if (errLineas) throw errLineas
       }
 
-      // Insertar pagos
       if (pagos.length > 0) {
         const { error: errPagos } = await supabase.from('pagos_compra').insert(
           pagos.map(p => ({
@@ -210,7 +205,6 @@ export function useCompras() {
         if (errPagos) throw errPagos
       }
 
-      // Impactar stock si la compra está recibida
       if (datos.estado === 'recibida' || datos.estado === 'recibida_parcial') {
         await impactarStock(supabase, compraId!, lineas)
       }
@@ -234,16 +228,19 @@ export function useCompras() {
   const recibirCompra = useCallback(async (
     id: number,
     lineasActualizadas: LineaCompra[],
-    parcial: boolean
+    parcial: boolean,
+    datosRecepcion: { numero_remito?: string; numero_factura?: string }
   ): Promise<boolean> => {
     const supabase = createClient()
     try {
       const nuevoEstado = parcial ? 'recibida_parcial' : 'recibida'
 
-      // Actualizar estado
-      await supabase.from('compras').update({ estado: nuevoEstado }).eq('id', id)
+      await supabase.from('compras').update({
+        estado: nuevoEstado,
+        numero_remito: datosRecepcion.numero_remito ?? null,
+        numero_factura: datosRecepcion.numero_factura ?? null,
+      }).eq('id', id)
 
-      // Actualizar cantidades recibidas
       for (const l of lineasActualizadas) {
         if (l.id) {
           await supabase.from('lineas_compra')
@@ -252,8 +249,34 @@ export function useCompras() {
         }
       }
 
-      // Impactar stock
       await impactarStock(supabase, id, lineasActualizadas)
+      await fetchCompras()
+      return true
+    } catch {
+      return false
+    }
+  }, [fetchCompras])
+
+  const registrarPago = useCallback(async (
+    compraId: number,
+    pago: PagoCompra,
+    totalLineas: number,
+    totalPagadoActual: number
+  ): Promise<boolean> => {
+    const supabase = createClient()
+    try {
+      await supabase.from('pagos_compra').insert({
+        compra_id: compraId,
+        fecha: pago.fecha,
+        monto: pago.monto,
+        metodo_pago: pago.metodo_pago,
+        notas: pago.notas ?? null,
+      })
+      const nuevoPagado = totalPagadoActual + pago.monto
+      const nuevoEstado = nuevoPagado >= totalLineas ? 'pagado' : 'parcial'
+      await supabase.from('compras')
+        .update({ estado_pago: nuevoEstado, monto_pagado: nuevoPagado })
+        .eq('id', compraId)
       await fetchCompras()
       return true
     } catch {
@@ -265,22 +288,23 @@ export function useCompras() {
     compras, todas, stats, loading, error,
     filtros, setFiltros, limpiarFiltros,
     recargar: fetchCompras,
-    guardarCompra, eliminarCompra, recibirCompra,
+    guardarCompra, eliminarCompra, recibirCompra, registrarPago,
   }
 }
 
-// ── Impactar stock según líneas recibidas ─────────────────────
+// ── Impactar stock ────────────────────────────────────────────
 async function impactarStock(supabase: any, compraId: number, lineas: LineaCompra[]) {
-  for (const l of lineas) {
+  // Si las líneas no tienen cantidad_recibida actualizada, las traemos de la DB
+  const lineasAUsar = lineas.length > 0 && lineas[0].id
+    ? lineas
+    : await supabase.from('lineas_compra').select('*').eq('compra_id', compraId).then((r: any) => r.data ?? [])
+
+  for (const l of lineasAUsar) {
     const cantidad = l.cantidad_recibida
     if (cantidad <= 0) continue
 
     if (l.tipo_destino === 'insumo' && l.item_id) {
-      const { data: ins } = await supabase
-        .from('insumos')
-        .select('stock, costo')
-        .eq('id', l.item_id)
-        .single()
+      const { data: ins } = await supabase.from('insumos').select('stock, costo').eq('id', l.item_id).single()
       if (ins) {
         await supabase.from('insumos').update({
           stock: ins.stock + cantidad,
@@ -288,11 +312,7 @@ async function impactarStock(supabase: any, compraId: number, lineas: LineaCompr
         }).eq('id', l.item_id)
       }
     } else if (l.tipo_destino === 'producto' && l.item_id) {
-      const { data: prod } = await supabase
-        .from('productos')
-        .select('stock, costo')
-        .eq('id', l.item_id)
-        .single()
+      const { data: prod } = await supabase.from('productos').select('stock, costo').eq('id', l.item_id).single()
       if (prod) {
         await supabase.from('productos').update({
           stock: prod.stock + cantidad,
@@ -300,6 +320,5 @@ async function impactarStock(supabase: any, compraId: number, lineas: LineaCompr
         }).eq('id', l.item_id)
       }
     }
-    // tipo_destino === 'otro' no impacta stock
   }
 }

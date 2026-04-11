@@ -1,6 +1,6 @@
 'use client'
 
-// src/app/dashboard/compras/nueva/page.tsx
+// src/app/dashboard/pedidos/nuevo/page.tsx
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -16,14 +16,12 @@ const CATEGORIAS_OTRO = [
   { val: 'otro',             label: 'Otro' },
 ]
 
-export default function NuevaCompraPage() {
+export default function NuevoPedidoPage() {
   const router = useRouter()
-  const { guardarCompra } = useCompras('directa')
+  const { guardarCompra } = useCompras('pedido')
 
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [proveedor, setProveedor] = useState<ProveedorBasico | null>(null)
-  const [numeroRemito, setNumeroRemito] = useState('')
-  const [numeroFactura, setNumeroFactura] = useState('')
   const [notas, setNotas] = useState('')
 
   const [lineas, setLineas] = useState<LineaCompra[]>([])
@@ -31,9 +29,9 @@ export default function NuevaCompraPage() {
   const [tipoNueva, setTipoNueva] = useState<'insumo' | 'producto' | 'otro'>('insumo')
   const [nombreLibre, setNombreLibre] = useState('')
 
-  const [estadoPago, setEstadoPago] = useState<'pagado' | 'pendiente' | 'parcial'>('pagado')
+  const [estadoPago, setEstadoPago] = useState<'pagado' | 'pendiente' | 'parcial'>('pendiente')
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia' | 'credito'>('efectivo')
-  const [montoPagado, setMontoPagado] = useState(0)
+  const [montoAnticipo, setMontoAnticipo] = useState(0)
   const [fechaPago, setFechaPago] = useState(new Date().toISOString().split('T')[0])
 
   const [guardando, setGuardando] = useState(false)
@@ -41,18 +39,13 @@ export default function NuevaCompraPage() {
 
   const total = lineas.reduce((s, l) => s + l.cantidad_pedida * l.precio_unitario, 0)
 
-  useEffect(() => {
-    if (estadoPago === 'pagado') setMontoPagado(total)
-    else if (estadoPago === 'pendiente') setMontoPagado(0)
-  }, [estadoPago, total])
-
   const agregarLinea = (item: any, tipo: 'insumo' | 'producto' | 'otro', nombre: string) => {
     setLineas(prev => [...prev, {
       tipo_destino: tipo,
       item_id: item?.id ?? null,
       nombre,
       cantidad_pedida: 1,
-      cantidad_recibida: 1,
+      cantidad_recibida: 0, // pedido previo → todavía no recibido
       precio_unitario: item?.costo ?? 0,
     }])
     setPanelAgregar(false)
@@ -60,36 +53,42 @@ export default function NuevaCompraPage() {
   }
 
   const handleGuardar = async () => {
+    if (!proveedor) { setError('El proveedor es obligatorio para un pedido'); return }
     if (lineas.length === 0) { setError('Agregá al menos un artículo'); return }
     setGuardando(true)
     setError('')
 
-    const pagos: PagoCompra[] = estadoPago !== 'pendiente' ? [{
+    const pagos: PagoCompra[] = estadoPago === 'parcial' && montoAnticipo > 0 ? [{
       fecha: fechaPago,
-      monto: estadoPago === 'pagado' ? total : montoPagado,
+      monto: montoAnticipo,
+      metodo_pago: metodoPago,
+      notas: 'Anticipo',
+    }] : estadoPago === 'pagado' ? [{
+      fecha: fechaPago,
+      monto: total,
       metodo_pago: metodoPago,
     }] : []
 
     const id = await guardarCompra({
-      proveedor_id: proveedor?.id ?? null,
-      fecha, tipo: 'directa', estado: 'recibida',
-      metodo_pago: metodoPago,
+      proveedor_id: proveedor.id,
+      fecha,
+      tipo: 'pedido',
+      estado: 'pendiente',
+      metodo_pago: estadoPago !== 'pendiente' ? metodoPago : null,
       estado_pago: estadoPago,
-      numero_remito: numeroRemito || null,
-      numero_factura: numeroFactura || null,
       notas: notas || null,
     } as any, lineas, pagos)
 
-    if (id) router.push('/dashboard/compras')
-    else { setError('Error al guardar la compra'); setGuardando(false) }
+    if (id) router.push('/dashboard/pedidos')
+    else { setError('Error al guardar el pedido'); setGuardando(false) }
   }
 
   return (
     <div className="p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs text-gray-400 mb-1">Compras › Nueva compra directa</p>
-          <h1 className="text-base font-medium text-gray-900">Nueva compra directa</h1>
+          <p className="text-xs text-gray-400 mb-1">Pedidos › Nuevo pedido</p>
+          <h1 className="text-base font-medium text-gray-900">Nueva orden de compra</h1>
         </div>
         <button onClick={() => router.back()}
           className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-500 hover:bg-gray-50">
@@ -97,8 +96,8 @@ export default function NuevaCompraPage() {
         </button>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-[12px] text-blue-800">
-        Compra ya realizada — cargás lo que compraste y abonaste. El stock se actualiza al confirmar.
+      <div className="bg-purple-50 border border-purple-200 rounded-lg px-4 py-2.5 text-[12px] text-purple-800">
+        Pedido previo al proveedor — se genera la OC, el stock se actualiza al confirmar la recepción.
       </div>
 
       <div className="grid grid-cols-[1fr_300px] gap-4 items-start">
@@ -109,7 +108,7 @@ export default function NuevaCompraPage() {
           {/* Artículos */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <div className="text-[13px] font-medium text-gray-900">Artículos comprados</div>
+              <div className="text-[13px] font-medium text-gray-900">Artículos a pedir</div>
               {!panelAgregar && (
                 <button onClick={() => setPanelAgregar(true)}
                   className="text-[11px] text-teal-600 font-medium hover:underline">+ Agregar artículo</button>
@@ -117,11 +116,11 @@ export default function NuevaCompraPage() {
             </div>
 
             {panelAgregar && (
-              <div className="mb-3 border border-dashed border-teal-300 bg-teal-50 rounded-lg p-3 flex flex-col gap-2">
+              <div className="mb-3 border border-dashed border-purple-300 bg-purple-50 rounded-lg p-3 flex flex-col gap-2">
                 <div className="flex gap-1.5">
                   {(['insumo', 'producto', 'otro'] as const).map(t => (
                     <button key={t} onClick={() => setTipoNueva(t)}
-                      className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg border transition-colors ${tipoNueva === t ? 'border-teal-500 bg-white text-teal-800' : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300'}`}>
+                      className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg border transition-colors ${tipoNueva === t ? 'border-purple-500 bg-white text-purple-800' : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300'}`}>
                       {t === 'insumo' ? 'Insumo' : t === 'producto' ? 'Producto' : 'Otro'}
                     </button>
                   ))}
@@ -130,10 +129,10 @@ export default function NuevaCompraPage() {
                   <div className="flex gap-2">
                     <input type="text" placeholder="Nombre del artículo..."
                       value={nombreLibre} onChange={e => setNombreLibre(e.target.value)}
-                      className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                      className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400" />
                     <button onClick={() => { if (nombreLibre.trim()) agregarLinea(null, 'otro', nombreLibre.trim()) }}
                       disabled={!nombreLibre.trim()}
-                      className="px-3 py-1.5 text-[11px] font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+                      className="px-3 py-1.5 text-[11px] font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">
                       Agregar
                     </button>
                   </div>
@@ -146,7 +145,7 @@ export default function NuevaCompraPage() {
 
             {lineas.length === 0 ? (
               <div className="text-center py-6 text-xs text-gray-400 border border-dashed border-gray-200 rounded-lg">
-                Agregá los artículos que compraste
+                Agregá los artículos que vas a pedir
               </div>
             ) : (
               <table className="w-full text-[12px]">
@@ -178,8 +177,8 @@ export default function NuevaCompraPage() {
                         )}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <input type="number" min={0} step={0.01} value={l.cantidad_pedida}
-                          onChange={e => setLineas(prev => prev.map((x, j) => j === i ? { ...x, cantidad_pedida: Number(e.target.value), cantidad_recibida: Number(e.target.value) } : x))}
+                        <input type="number" min={1} step={0.01} value={l.cantidad_pedida}
+                          onChange={e => setLineas(prev => prev.map((x, j) => j === i ? { ...x, cantidad_pedida: Number(e.target.value) } : x))}
                           className="w-20 text-center text-[12px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -205,45 +204,42 @@ export default function NuevaCompraPage() {
         {/* DERECHA */}
         <div className="flex flex-col gap-4">
 
-          {/* Datos */}
+          {/* Proveedor y datos */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
-            <div className="text-[13px] font-medium text-gray-900">Datos de la compra</div>
+            <div className="text-[13px] font-medium text-gray-900">Datos del pedido</div>
+
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] text-gray-500 uppercase tracking-wide">Fecha</label>
               <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
                 className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:border-teal-400" />
             </div>
+
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Proveedor (opcional)</label>
-              <SelectorProveedor value={proveedor} onChange={setProveedor} />
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">
+                Proveedor <span className="text-amber-600">*</span>
+              </label>
+              <SelectorProveedor value={proveedor} onChange={setProveedor} obligatorio />
+              {!proveedor && (
+                <p className="text-[11px] text-amber-600">Obligatorio para generar la OC</p>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-gray-500 uppercase tracking-wide">N° Remito</label>
-                <input type="text" value={numeroRemito} onChange={e => setNumeroRemito(e.target.value)} placeholder="Opcional"
-                  className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-gray-500 uppercase tracking-wide">N° Factura</label>
-                <input type="text" value={numeroFactura} onChange={e => setNumeroFactura(e.target.value)} placeholder="Opcional"
-                  className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
-              </div>
-            </div>
+
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Notas</label>
-              <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={2} placeholder="Observaciones..."
+              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Notas / Observaciones</label>
+              <textarea value={notas} onChange={e => setNotas(e.target.value)} rows={3}
+                placeholder="Condiciones, plazos de entrega, aclaraciones..."
                 className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 resize-none" />
             </div>
           </div>
 
           {/* Pago */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
-            <div className="text-[13px] font-medium text-gray-900">Pago</div>
+            <div className="text-[13px] font-medium text-gray-900">Condición de pago</div>
             <div className="flex flex-col gap-1.5">
               {([
-                { val: 'pagado',    label: 'Ya pagué todo',     hint: 'Abonado completo' },
-                { val: 'parcial',   label: 'Pagué en parte',    hint: 'Queda saldo pendiente' },
-                { val: 'pendiente', label: 'Pago pendiente',    hint: 'A crédito o sin abonar' },
+                { val: 'pendiente', label: 'Pago pendiente',  hint: 'Se paga al recibir la mercadería' },
+                { val: 'parcial',   label: 'Anticipo parcial', hint: 'El proveedor requiere un adelanto' },
+                { val: 'pagado',    label: 'Prepago total',    hint: 'Se paga antes de recibirlo' },
               ] as const).map(op => (
                 <label key={op.val} className={`flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${estadoPago === op.val ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'}`}>
                   <input type="radio" name="ep" checked={estadoPago === op.val} onChange={() => setEstadoPago(op.val)} className="flex-shrink-0" />
@@ -254,6 +250,7 @@ export default function NuevaCompraPage() {
                 </label>
               ))}
             </div>
+
             {estadoPago !== 'pendiente' && (
               <>
                 <div className="flex gap-2">
@@ -266,8 +263,9 @@ export default function NuevaCompraPage() {
                 </div>
                 {estadoPago === 'parcial' && (
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[11px] text-gray-500 uppercase tracking-wide">Monto pagado</label>
-                    <input type="number" min={0} value={montoPagado || ''} onChange={e => setMontoPagado(Number(e.target.value))}
+                    <label className="text-[11px] text-gray-500 uppercase tracking-wide">Monto del anticipo</label>
+                    <input type="number" min={0} max={total} value={montoAnticipo || ''}
+                      onChange={e => setMontoAnticipo(Number(e.target.value))}
                       className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400" />
                   </div>
                 )}
@@ -280,22 +278,36 @@ export default function NuevaCompraPage() {
             )}
           </div>
 
-          {/* Total */}
+          {/* Total y confirmar */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Resumen del pedido</div>
             <div className="flex justify-between text-[13px]">
-              <span className="text-gray-600">Total compra</span>
-              <span className="font-medium text-gray-900">{formatMonto(total)}</span>
+              <span className="text-gray-600">Total a abonar</span>
+              <span className="text-xl font-medium text-gray-900">{formatMonto(total)}</span>
             </div>
-            {estadoPago === 'parcial' && montoPagado > 0 && (
-              <div className="flex justify-between text-[12px]">
-                <span className="text-gray-500">Saldo pendiente</span>
-                <span className="font-medium text-amber-700">{formatMonto(total - montoPagado)}</span>
+            {estadoPago === 'parcial' && montoAnticipo > 0 && (
+              <>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-500">Anticipo</span>
+                  <span className="font-medium text-amber-700">{formatMonto(montoAnticipo)}</span>
+                </div>
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-500">Saldo al recibir</span>
+                  <span className="font-medium text-gray-700">{formatMonto(total - montoAnticipo)}</span>
+                </div>
+              </>
+            )}
+            {estadoPago === 'pendiente' && total > 0 && (
+              <div className="text-[11px] text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+                El pago se registrará al recibir la mercadería
               </div>
             )}
+
             {error && <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
-            <button onClick={handleGuardar} disabled={guardando || lineas.length === 0}
-              className="w-full py-2.5 text-sm font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors">
-              {guardando ? 'Registrando...' : `Registrar compra · ${formatMonto(total)}`}
+
+            <button onClick={handleGuardar} disabled={guardando || lineas.length === 0 || !proveedor}
+              className="w-full py-2.5 text-sm font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors">
+              {guardando ? 'Generando OC...' : `Generar orden de compra · ${formatMonto(total)}`}
             </button>
           </div>
         </div>

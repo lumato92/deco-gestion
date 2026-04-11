@@ -62,9 +62,18 @@ export default function Sidebar() {
       ],
     },
     {
+      section: 'Compras',
+      show: esAdmin,
+      items: [
+        { href: '/dashboard/compras/nueva', label: 'Nueva compra',  show: esAdmin },
+        { href: '/dashboard/compras',       label: 'Compras',       show: esAdmin },
+        { href: '/dashboard/pedidos/nuevo', label: 'Nuevo pedido',  show: esAdmin },
+        { href: '/dashboard/pedidos',       label: 'Pedidos (OC)',  show: esAdmin },
+      ],
+    },
+    {
       section: 'Negocio',
       items: [
-        { href: '/dashboard/compras',     label: 'Compras',      show: esAdmin },
         { href: '/dashboard/clientes',    label: 'Clientes',     show: true },
         { href: '/dashboard/finanzas',    label: 'Finanzas',     show: esAdmin },
         { href: '/dashboard/gastos',      label: 'Gastos',       show: esAdmin },
@@ -73,6 +82,7 @@ export default function Sidebar() {
     },
     ...(usuario?.rol === 'root' ? [{
       section: 'Administración',
+      show: true,
       items: [
         { href: '/dashboard/usuarios', label: 'Usuarios', show: true },
       ],
@@ -98,22 +108,28 @@ export default function Sidebar() {
       </Link>
 
       {/* Nav por sección */}
-      {nav.map(({ section, items }) => (
-        <div key={section}>
-          <div className="px-4 py-2 mt-2 text-[10px] text-gray-400 uppercase tracking-widest">
-            {section}
+      {nav.map(({ section, items, show: showSection = true }) => {
+        if (!showSection) return null
+        const itemsVisibles = items.filter(i => i.show)
+        if (itemsVisibles.length === 0) return null
+        return (
+          <div key={section}>
+            <div className="px-4 py-2 mt-2 text-[10px] text-gray-400 uppercase tracking-widest">
+              {section}
+            </div>
+            {itemsVisibles.map(({ href, label }) => (
+              <Link key={href} href={href}
+                className={cn(
+                  'flex items-center gap-2 pl-8 pr-4 py-2 text-xs text-gray-500 hover:bg-white hover:text-gray-900',
+                  path.startsWith(href) && href !== '/dashboard/compras' && 'bg-white text-gray-900 font-medium border-l-2 border-teal-600',
+                  path === href && 'bg-white text-gray-900 font-medium border-l-2 border-teal-600',
+                )}>
+                {label}
+              </Link>
+            ))}
           </div>
-          {items.filter(i => i.show).map(({ href, label }) => (
-            <Link key={href} href={href}
-              className={cn(
-                'flex items-center gap-2 pl-8 pr-4 py-2 text-xs text-gray-500 hover:bg-white hover:text-gray-900',
-                path.startsWith(href) && 'bg-white text-gray-900 font-medium border-l-2 border-teal-600'
-              )}>
-              {label}
-            </Link>
-          ))}
-        </div>
-      ))}
+        )
+      })}
 
       <div className="flex-1" />
 
@@ -131,9 +147,7 @@ export default function Sidebar() {
               </span>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            disabled={cerrando}
+          <button onClick={handleLogout} disabled={cerrando}
             className="w-full text-left text-[11px] text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded hover:bg-gray-100 transition-colors disabled:opacity-50">
             {cerrando ? 'Cerrando...' : '← Cerrar sesión'}
           </button>
