@@ -1,7 +1,6 @@
 'use client'
 
 // src/components/layout/sidebar.tsx
-// Con usuario logueado, botón de logout y sección de usuarios para root
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -31,7 +30,6 @@ export default function Sidebar() {
   const [cerrando, setCerrando] = useState(false)
 
   useEffect(() => {
-    // Obtener sesión desde la API
     fetch('/api/auth/me')
       .then(r => r.json())
       .then(data => { if (data.usuario) setUsuario(data.usuario) })
@@ -47,14 +45,13 @@ export default function Sidebar() {
 
   const esAdmin = usuario?.rol === 'root' || usuario?.rol === 'admin'
 
-  // Navegación según rol
   const nav = [
     {
       section: 'Ventas',
       items: [
-        { href: '/dashboard/ventas/nueva',        label: 'Nueva venta',     show: true },
+        { href: '/dashboard/ventas/nueva',        label: 'Nueva venta',      show: true },
         { href: '/dashboard/ventas',              label: 'Todas las ventas', show: true },
-        { href: '/dashboard/ventas/presupuestos', label: 'Presupuestos',    show: true },
+        { href: '/dashboard/ventas/presupuestos', label: 'Presupuestos',     show: true },
       ],
     },
     {
@@ -67,10 +64,11 @@ export default function Sidebar() {
     {
       section: 'Negocio',
       items: [
-        { href: '/dashboard/clientes',  label: 'Clientes',  show: true },
-        { href: '/dashboard/finanzas',  label: 'Finanzas',  show: esAdmin },
-        { href: '/dashboard/gastos',    label: 'Gastos',    show: esAdmin },
-        { href: '/dashboard/proveedores', label: 'Proveedores', show: esAdmin },
+        { href: '/dashboard/compras',     label: 'Compras',      show: esAdmin },
+        { href: '/dashboard/clientes',    label: 'Clientes',     show: true },
+        { href: '/dashboard/finanzas',    label: 'Finanzas',     show: esAdmin },
+        { href: '/dashboard/gastos',      label: 'Gastos',       show: esAdmin },
+        { href: '/dashboard/proveedores', label: 'Proveedores',  show: esAdmin },
       ],
     },
     ...(usuario?.rol === 'root' ? [{
@@ -117,7 +115,6 @@ export default function Sidebar() {
         </div>
       ))}
 
-      {/* Spacer */}
       <div className="flex-1" />
 
       {/* Usuario logueado */}
