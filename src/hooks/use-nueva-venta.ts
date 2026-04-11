@@ -26,7 +26,13 @@ export interface FormVenta {
   monto_sena: number
   notas: string
   entrega_inmediata: boolean
+  fecha: string
+  desde_point: boolean
   items: ItemVenta[]
+}
+
+function fechaHoy() {
+  return new Date().toISOString().split('T')[0]
 }
 
 const FORM_INICIAL: FormVenta = {
@@ -40,6 +46,8 @@ const FORM_INICIAL: FormVenta = {
   monto_sena: 0,
   notas: '',
   entrega_inmediata: false,
+  fecha: fechaHoy(),
+  desde_point: false,
   items: [],
 }
 
@@ -52,7 +60,7 @@ const RECARGO: Record<MetodoPago, number> = {
 }
 
 export function useNuevaVenta() {
-  const [form, setFormState] = useState<FormVenta>(FORM_INICIAL)
+  const [form, setFormState] = useState<FormVenta>({ ...FORM_INICIAL, fecha: fechaHoy() })
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -61,7 +69,7 @@ export function useNuevaVenta() {
   }, [])
 
   const resetForm = useCallback(() => {
-    setFormState(FORM_INICIAL)
+    setFormState({ ...FORM_INICIAL, fecha: fechaHoy() })
     setError(null)
   }, [])
 
@@ -87,30 +95,21 @@ export function useNuevaVenta() {
   // ── Items ─────────────────────────────────────────────────
 
   const agregarItem = useCallback((item: ItemVenta) => {
-    setFormState(prev => ({
-      ...prev,
-      items: [...prev.items, item],
-    }))
+    setFormState(prev => ({ ...prev, items: [...prev.items, item] }))
   }, [])
 
   const quitarItem = useCallback((idx: number) => {
-    setFormState(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== idx),
-    }))
+    setFormState(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }))
   }, [])
 
   const actualizarItem = useCallback((idx: number, cambios: Partial<ItemVenta>) => {
     setFormState(prev => ({
       ...prev,
-      items: prev.items.map((item, i) =>
-        i === idx ? { ...item, ...cambios } : item
-      ),
+      items: prev.items.map((item, i) => i === idx ? { ...item, ...cambios } : item),
     }))
   }, [])
 
   // ── Confirmar venta ───────────────────────────────────────
-  // Retorna el id del pedido creado, o false si hubo error
 
   const confirmarVenta = useCallback(async (): Promise<number | false> => {
     if (form.items.length === 0) {
@@ -122,11 +121,11 @@ export function useNuevaVenta() {
     setError(null)
     const supabase = createClient()
 
-    const ahora = new Date().toISOString()
+    const fechaBase = form.fecha || fechaHoy()
+    const fechaConfirmacion = new Date(`${fechaBase}T${new Date().toTimeString().split(' ')[0]}`).toISOString()
     const estadoInicial = form.entrega_inmediata ? 'entregado' : 'confirmado'
 
     try {
-      // 1. Crear el pedido
       const { data: pedido, error: errPedido } = await supabase
         .from('pedidos')
         .insert({
@@ -138,15 +137,15 @@ export function useNuevaVenta() {
           descuento_pct: Math.round(descuentoPct * 100) / 100,
           recargo_pct: recargoPct,
           notas: form.notas || null,
-          fecha_confirmacion: ahora,
-          ...(form.entrega_inmediata ? { fecha_entrega: ahora } : {}),
+          fecha_pedido: fechaConfirmacion,
+          fecha_confirmacion: fechaConfirmacion,
+          ...(form.entrega_inmediata ? { fecha_entrega: fechaConfirmacion } : {}),
         })
         .select('id')
         .single()
 
       if (errPedido || !pedido) throw new Error(errPedido?.message ?? 'Error al crear el pedido')
 
-      // 2. Insertar items
       const { error: errItems } = await supabase
         .from('items_pedido')
         .insert(
@@ -163,8 +162,9 @@ export function useNuevaVenta() {
 
       if (errItems) throw new Error(errItems.message)
 
-      // 3. Registrar pago — si es MP lo omitimos, el webhook lo registra cuando se acredite
-      if (form.metodo_pago !== 'mercadopago') {
+      // Si viene desde Point NO registramos el pago acá —
+      // lo registra la route /api/pagos/point/asignar para evitar duplicado
+      if (form.metodo_pago !== 'mercadopago' && !form.desde_point) {
         const { error: errPago } = await supabase
           .from('pagos_pedido')
           .insert({
@@ -173,11 +173,9 @@ export function useNuevaVenta() {
             metodo_pago: form.metodo_pago,
             monto: form.con_sena ? form.monto_sena : total,
           })
-
         if (errPago) throw new Error(errPago.message)
       }
 
-      // 4. Descontar stock via función de Supabase
       const { data: resultado } = await supabase
         .rpc('descontar_stock_pedido', { p_pedido_id: pedido.id })
 
@@ -195,21 +193,10 @@ export function useNuevaVenta() {
   }, [form, total, descuentoPct, recargoPct])
 
   return {
-    form,
-    setForm,
-    resetForm,
-    agregarItem,
-    quitarItem,
-    actualizarItem,
-    confirmarVenta,
-    guardando,
-    error,
-    // calculados
-    subtotal,
-    descuentoMonto,
-    descuentoPct,
-    recargoPct,
-    recargoMonto,
-    total,
+    form, setForm, resetForm,
+    agregarItem, quitarItem, actualizarItem,
+    confirmarVenta, guardando, error,
+    subtotal, descuentoMonto, descuentoPct,
+    recargoPct, recargoMonto, total,
   }
 }

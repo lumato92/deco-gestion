@@ -293,8 +293,6 @@ function NuevaVentaContent() {
   const [entregaInmediataConfirmada, setEntregaInmediataConfirmada] = useState(false)
   const [linkMP, setLinkMP] = useState<string | undefined>(undefined)
   const [pagoPointAsignado, setPagoPointAsignado] = useState(false)
-
-  // Leer pago Point pendiente del sessionStorage
   const [pagoPoint, setPagoPoint] = useState<PagoPointPendiente | null>(null)
 
   useEffect(() => {
@@ -302,47 +300,40 @@ function NuevaVentaContent() {
       const stored = sessionStorage.getItem('point_pago_pendiente')
       if (stored) {
         try {
-          setPagoPoint(JSON.parse(stored))
+          const datos = JSON.parse(stored)
+          setPagoPoint(datos)
+          // Flag para que confirmarVenta NO registre el pago — lo hace point/asignar
+          setForm({ desde_point: true })
         } catch {}
       }
     }
   }, [desdePoint])
 
-  // Cargar productos al montar
   useEffect(() => {
     const supabase = createClient()
     supabase.from('productos_con_margen')
       .select('id, nombre, categoria_nombre, stock, costo, precio')
-      .eq('estado', 'activo')
-      .limit(200)
+      .eq('estado', 'activo').limit(200)
       .then(({ data }) => setTodosProds(data ?? []))
   }, [])
 
-  // Cargar clientes al montar
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('clientes')
-      .select('id, nombre, telefono, canal')
-      .order('nombre')
-      .limit(300)
+    supabase.from('clientes').select('id, nombre, telefono, canal').order('nombre').limit(300)
       .then(({ data }) => setTodosClientes(data ?? []))
   }, [])
 
-  // Filtrar productos localmente
   useEffect(() => {
     if (busquedaProd.length < 2) { setResultadosProd([]); return }
     const q = normalizar(busquedaProd)
     setResultadosProd(todosProds.filter(p => normalizar(p.nombre).includes(q)).slice(0, 8))
   }, [busquedaProd, todosProds])
 
-  // Filtrar clientes localmente
   useEffect(() => {
     if (busquedaCli.length < 1) { setResultadosCli([]); return }
     const q = normalizar(busquedaCli)
     setResultadosCli(
-      todosClientes.filter(c =>
-        normalizar(c.nombre).includes(q) || (c.telefono ?? '').includes(q)
-      ).slice(0, 6)
+      todosClientes.filter(c => normalizar(c.nombre).includes(q) || (c.telefono ?? '').includes(q)).slice(0, 6)
     )
   }, [busquedaCli, todosClientes])
 
@@ -377,24 +368,19 @@ function NuevaVentaContent() {
     setPedidoIdConfirmado(pedidoId)
     setEntregaInmediataConfirmada(fueEntregaInmediata)
 
-    // Si venimos desde Point, asignamos el pago automáticamente
+    // Asignar pago Point — este es el ÚNICO registro de pago cuando viene desde Point
     if (pagoPoint) {
       try {
         const res = await fetch('/api/pagos/point/asignar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mp_pago_id: pagoPoint.mp_pago_id,
-            pedido_id: pedidoId,
-          }),
+          body: JSON.stringify({ mp_pago_id: pagoPoint.mp_pago_id, pedido_id: pedidoId }),
         })
         if (res.ok) {
           sessionStorage.removeItem('point_pago_pendiente')
           setPagoPointAsignado(true)
         }
-      } catch {
-        // Si falla la asignación igual mostramos el popup
-      }
+      } catch {}
     }
 
     if (esMercadoPago) {
@@ -426,7 +412,6 @@ function NuevaVentaContent() {
   return (
     <div className="p-5 flex flex-col gap-4">
 
-      {/* Popup éxito */}
       {ventaConfirmada && (
         <PopupExito
           total={totalConfirmado}
@@ -448,12 +433,8 @@ function NuevaVentaContent() {
         />
       )}
 
-      {/* Modal nuevo cliente */}
       {modalNuevoCliente && (
-        <ModalNuevoCliente
-          onGuardar={nuevoClienteGuardado}
-          onCancelar={() => setModalNuevoCliente(false)}
-        />
+        <ModalNuevoCliente onGuardar={nuevoClienteGuardado} onCancelar={() => setModalNuevoCliente(false)} />
       )}
 
       {/* Topbar */}
@@ -468,7 +449,6 @@ function NuevaVentaContent() {
         </button>
       </div>
 
-      {/* Banner pago Point si venimos desde ahí */}
       {pagoPoint && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -483,9 +463,7 @@ function NuevaVentaContent() {
               </span>
             </div>
           </div>
-          <span className="text-[11px] text-amber-600">
-            Se asignará al confirmar la venta
-          </span>
+          <span className="text-[11px] text-amber-600">Se asignará al confirmar la venta</span>
         </div>
       )}
 
@@ -536,10 +514,7 @@ function NuevaVentaContent() {
             </div>
 
             {mostrarFormLibre && (
-              <FormProductoLibre
-                onAgregar={agregarProductoLibre}
-                onCancelar={() => setMostrarFormLibre(false)}
-              />
+              <FormProductoLibre onAgregar={agregarProductoLibre} onCancelar={() => setMostrarFormLibre(false)} />
             )}
 
             {form.items.length === 0 ? (
@@ -680,18 +655,29 @@ function NuevaVentaContent() {
             )}
           </div>
 
-          {/* Canal */}
+          {/* Detalles — fecha + canal */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Detalles</div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-gray-500 uppercase tracking-wide">Canal de venta</label>
-              <select value={form.canal_venta} onChange={e => setForm({ canal_venta: e.target.value as CanalVenta })}
-                className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400">
-                <option value="directo">Directo (local físico)</option>
-                <option value="whatsapp">WhatsApp</option>
-                <option value="instagram">Instagram</option>
-                <option value="tienda">Tienda</option>
-              </select>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] text-gray-500 uppercase tracking-wide">Fecha de la venta</label>
+                <input
+                  type="date"
+                  value={form.fecha}
+                  onChange={e => setForm({ fecha: e.target.value })}
+                  className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:border-teal-400"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] text-gray-500 uppercase tracking-wide">Canal de venta</label>
+                <select value={form.canal_venta} onChange={e => setForm({ canal_venta: e.target.value as CanalVenta })}
+                  className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400">
+                  <option value="directo">Directo (local físico)</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="instagram">Instagram</option>
+                  <option value="tienda">Tienda</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -788,7 +774,6 @@ function NuevaVentaContent() {
                 </div>
               )}
 
-              {/* Si venimos desde Point, mostramos comparación */}
               {pagoPoint && total > 0 && (
                 <div className={`flex justify-between text-[12px] pt-1.5 border-t border-gray-100 ${
                   Math.abs(pagoPoint.monto - total) <= 5 ? 'text-teal-600' : 'text-amber-600'
