@@ -467,6 +467,30 @@ function NuevaVentaContent() {
         </div>
       )}
 
+      {/* Fecha + Canal — fila compacta */}
+      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4">
+        <div className="flex items-center gap-2 flex-1">
+          <label className="text-[11px] text-gray-500 uppercase tracking-wide whitespace-nowrap">Fecha de la venta</label>
+          <input
+            type="date"
+            value={form.fecha}
+            onChange={e => setForm({ fecha: e.target.value })}
+            className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 focus:outline-none focus:border-teal-400"
+          />
+        </div>
+        <div className="w-px h-6 bg-gray-200" />
+        <div className="flex items-center gap-2 flex-1">
+          <label className="text-[11px] text-gray-500 uppercase tracking-wide whitespace-nowrap">Canal de venta</label>
+          <select value={form.canal_venta} onChange={e => setForm({ canal_venta: e.target.value as CanalVenta })}
+            className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 focus:outline-none focus:border-teal-400">
+            <option value="directo">Directo (local físico)</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="instagram">Instagram</option>
+            <option value="tienda">Tienda</option>
+          </select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-[1fr_320px] gap-4 items-start">
 
         {/* COLUMNA IZQUIERDA */}
@@ -655,31 +679,6 @@ function NuevaVentaContent() {
             )}
           </div>
 
-          {/* Detalles — fecha + canal */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <div className="text-[13px] font-medium text-gray-900 mb-3">Detalles</div>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-gray-500 uppercase tracking-wide">Fecha de la venta</label>
-                <input
-                  type="date"
-                  value={form.fecha}
-                  onChange={e => setForm({ fecha: e.target.value })}
-                  className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:border-teal-400"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] text-gray-500 uppercase tracking-wide">Canal de venta</label>
-                <select value={form.canal_venta} onChange={e => setForm({ canal_venta: e.target.value as CanalVenta })}
-                  className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-teal-400">
-                  <option value="directo">Directo (local físico)</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="instagram">Instagram</option>
-                  <option value="tienda">Tienda</option>
-                </select>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* COLUMNA DERECHA */}
