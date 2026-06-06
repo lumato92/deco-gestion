@@ -120,6 +120,7 @@ export default function EditarPresupuestoPage() {
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [noEditable, setNoEditable] = useState<string | null>(null)
 
   // Datos del presupuesto
   const [clienteId, setClienteId] = useState<number | null>(null)
@@ -159,6 +160,19 @@ export default function EditarPresupuestoPage() {
 
       if (pedidoRes.data) {
         const p = pedidoRes.data
+
+        // Solo se pueden editar presupuestos sin confirmar.
+        // Una vez confirmado, el pedido ya descontó stock / generó pagos.
+        if (p.estado !== 'presupuesto') {
+          setNoEditable(
+            p.estado === 'cancelado'
+              ? 'Este presupuesto fue cancelado y no puede editarse.'
+              : 'Este presupuesto ya fue confirmado y no puede editarse.'
+          )
+          setLoading(false)
+          return
+        }
+
         setClienteId(p.cliente_id ?? null)
         setCanalVenta(p.canal_venta ?? 'whatsapp')
         setFechaEntrega(p.fecha_entrega ? p.fecha_entrega.split('T')[0] : '')
@@ -337,6 +351,24 @@ export default function EditarPresupuestoPage() {
             <div className="h-10 bg-gray-100 rounded animate-pulse" />
           </div>
         ))}
+      </div>
+    )
+  }
+
+  if (noEditable) {
+    return (
+      <div className="p-5 flex flex-col gap-4">
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Ventas › Presupuestos › Editar #{id}</p>
+          <h1 className="text-base font-medium text-gray-900">Editar presupuesto</h1>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-6 flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-amber-800">{noEditable}</p>
+          <button onClick={() => router.push('/dashboard/ventas/presupuestos')}
+            className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+            Volver a presupuestos
+          </button>
+        </div>
       </div>
     )
   }
