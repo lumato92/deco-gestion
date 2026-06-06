@@ -8,109 +8,22 @@ import { usePresupuestos } from '@/hooks/use-presupuestos'
 import { formatMonto, formatFecha } from '@/lib/utils'
 import type { PedidoConTotal } from '@/lib/types'
 
-// ── Modal de confirmación ─────────────────────────────────────
-
-function ModalConfirmar({
-  pedido,
-  onConfirmar,
-  onCancelar,
-  confirmando,
-  error,
-}: {
-  pedido: PedidoConTotal
-  onConfirmar: (destino: 'confirmado' | 'en_fabricacion') => void
-  onCancelar: () => void
-  confirmando: boolean
-  error: string | null
-}) {
-  const [destino, setDestino] = useState<'confirmado' | 'en_fabricacion'>('confirmado')
-  const adelanto = Math.round(pedido.total_cobrado / 2)
-
-  return (
-    <div style={{ minHeight: 400 }} className="flex items-center justify-center bg-black/30 rounded-xl">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-md mx-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-1">
-          Confirmar presupuesto #{pedido.id}
-        </h3>
-        <p className="text-xs text-gray-400 mb-4">
-          {pedido.cliente_nombre ?? '(sin cliente)'} · {formatMonto(pedido.total_cobrado)}
-        </p>
-
-        <div className="flex flex-col gap-2 mb-4">
-          <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-gray-50"
-            style={{ borderColor: destino === 'confirmado' ? '#0F6E56' : undefined,
-                     background: destino === 'confirmado' ? '#E1F5EE' : undefined }}>
-            <input
-              type="radio"
-              name="destino"
-              value="confirmado"
-              checked={destino === 'confirmado'}
-              onChange={() => setDestino('confirmado')}
-              className="mt-0.5"
-            />
-            <div>
-              <div className="text-[13px] font-medium text-gray-900">Stock disponible</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">
-                Se descuenta el stock y queda listo para entregar
-              </div>
-            </div>
-          </label>
-
-          <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors hover:bg-gray-50"
-            style={{ borderColor: destino === 'en_fabricacion' ? '#854F0B' : undefined,
-                     background: destino === 'en_fabricacion' ? '#FAEEDA' : undefined }}>
-            <input
-              type="radio"
-              name="destino"
-              value="en_fabricacion"
-              checked={destino === 'en_fabricacion'}
-              onChange={() => setDestino('en_fabricacion')}
-              className="mt-0.5"
-            />
-            <div>
-              <div className="text-[13px] font-medium text-gray-900">Requiere fabricación externa</div>
-              <div className="text-[11px] text-gray-400 mt-0.5">
-                Se solicita adelanto del 50% · {formatMonto(adelanto)}
-              </div>
-            </div>
-          </label>
-        </div>
-
-        {error && (
-          <div className="mb-3 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            {error}
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <button
-            onClick={onCancelar}
-            className="flex-1 py-2 text-xs font-medium border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={() => onConfirmar(destino)}
-            disabled={confirmando}
-            className="flex-1 py-2 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
-          >
-            {confirmando ? 'Confirmando...' : 'Confirmar'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Página ────────────────────────────────────────────────────
 
 export default function PresupuestosPage() {
   const { presupuestos, loading, error, confirmar, cancelar } = usePresupuestos()
 
   const [pedidoConfirmando, setPedidoConfirmando] = useState<PedidoConTotal | null>(null)
+  const [destino, setDestino] = useState<'confirmado' | 'en_fabricacion'>('confirmado')
   const [confirmando, setConfirmando] = useState(false)
   const [errorConfirm, setErrorConfirm] = useState<string | null>(null)
   const [pedidoCancelando, setPedidoCancelando] = useState<number | null>(null)
+
+  const abrirConfirmar = (p: PedidoConTotal) => {
+    setDestino('confirmado')
+    setErrorConfirm(null)
+    setPedidoConfirmando(p)
+  }
 
   const handleConfirmar = async (destino: 'confirmado' | 'en_fabricacion') => {
     if (!pedidoConfirmando) return
@@ -145,43 +58,35 @@ export default function PresupuestosPage() {
               {pedidoConfirmando.cliente_nombre ?? '(sin cliente)'} · {formatMonto(pedidoConfirmando.total_cobrado)}
             </p>
 
-            {(() => {
-              const adelanto = Math.round(pedidoConfirmando.total_cobrado / 2)
-              const [destino, setDestino] = useState<'confirmado' | 'en_fabricacion'>('confirmado')
-              return (
-                <>
-                  <div className="flex flex-col gap-2 mb-4">
-                    <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${destino === 'confirmado' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                      <input type="radio" name="dest" checked={destino === 'confirmado'} onChange={() => setDestino('confirmado')} className="mt-0.5" />
-                      <div>
-                        <div className="text-[13px] font-medium text-gray-900">Stock disponible</div>
-                        <div className="text-[11px] text-gray-400 mt-0.5">Se descuenta stock, listo para entregar</div>
-                      </div>
-                    </label>
-                    <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${destino === 'en_fabricacion' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                      <input type="radio" name="dest" checked={destino === 'en_fabricacion'} onChange={() => setDestino('en_fabricacion')} className="mt-0.5" />
-                      <div>
-                        <div className="text-[13px] font-medium text-gray-900">Fabricación externa</div>
-                        <div className="text-[11px] text-gray-400 mt-0.5">Adelanto del 50% · {formatMonto(adelanto)}</div>
-                      </div>
-                    </label>
-                  </div>
-                  {errorConfirm && (
-                    <div className="mb-3 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                      {errorConfirm}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <button onClick={() => setPedidoConfirmando(null)} className="flex-1 py-2 text-xs font-medium border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
-                      Cancelar
-                    </button>
-                    <button onClick={() => handleConfirmar(destino)} disabled={confirmando} className="flex-1 py-2 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
-                      {confirmando ? 'Confirmando...' : 'Confirmar'}
-                    </button>
-                  </div>
-                </>
-              )
-            })()}
+            <div className="flex flex-col gap-2 mb-4">
+              <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${destino === 'confirmado' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <input type="radio" name="dest" checked={destino === 'confirmado'} onChange={() => setDestino('confirmado')} className="mt-0.5" />
+                <div>
+                  <div className="text-[13px] font-medium text-gray-900">Stock disponible</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">Se descuenta stock, listo para entregar</div>
+                </div>
+              </label>
+              <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer ${destino === 'en_fabricacion' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <input type="radio" name="dest" checked={destino === 'en_fabricacion'} onChange={() => setDestino('en_fabricacion')} className="mt-0.5" />
+                <div>
+                  <div className="text-[13px] font-medium text-gray-900">Fabricación externa</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">Adelanto del 50% · {formatMonto(Math.round(pedidoConfirmando.total_cobrado / 2))}</div>
+                </div>
+              </label>
+            </div>
+            {errorConfirm && (
+              <div className="mb-3 text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {errorConfirm}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setPedidoConfirmando(null)} className="flex-1 py-2 text-xs font-medium border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={() => handleConfirmar(destino)} disabled={confirmando} className="flex-1 py-2 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50">
+                {confirmando ? 'Confirmando...' : 'Confirmar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -276,11 +181,17 @@ export default function PresupuestosPage() {
                       <td className="px-4 py-2.5">
                         <div className="flex gap-1.5 justify-end">
                           <button
-                            onClick={() => setPedidoConfirmando(p)}
+                            onClick={() => abrirConfirmar(p)}
                             className="text-[11px] px-2.5 py-1 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
                           >
                             Confirmar
                           </button>
+                          <Link
+                            href={`/dashboard/ventas/presupuestos/${p.id}/editar`}
+                            className="text-[11px] px-2.5 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"
+                          >
+                            Editar
+                          </Link>
                           <a href={`/api/pdf/presupuesto?id=${p.id}`} target="_blank"
                             className="text-[11px] px-2.5 py-1 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
                             PDF

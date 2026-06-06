@@ -216,7 +216,7 @@ export function PresupuestoPDF({
             </View>
             {descuento_pct > 0 && (
               <View style={s.totalRow}>
-                <Text style={{ fontSize: 10, color: COLORS.gray }}>Descuento ({descuento_pct}%)</Text>
+                <Text style={{ fontSize: 10, color: COLORS.gray }}>Descuento</Text>
                 <Text style={{ fontSize: 10, color: COLORS.gray }}>— {formatMonto(descuentoMonto)}</Text>
               </View>
             )}
