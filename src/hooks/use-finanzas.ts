@@ -86,7 +86,7 @@ export function useFinanzas() {
           // Pedidos de los últimos 6 meses
           supabase
             .from('pedidos_con_total')
-            .select('fecha_confirmacion, total_cobrado, ganancia, cant_items')
+            .select('fecha_confirmacion, total_cobrado, ganancia, comisiones_mp, cant_items')
             .eq('estado', 'entregado')
             .gte('fecha_confirmacion', `${mesesQuery[0]}-01`)
             .order('fecha_confirmacion'),
@@ -129,8 +129,9 @@ export function useFinanzas() {
         )
         const gastosMes = gastos.filter(g => g.fecha?.startsWith(mes))
 
-        const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0), 0)
-        const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0), 0)
+        // El ingreso y la ganancia se muestran netos de comisiones de MP.
+        const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.comisiones_mp ?? 0), 0)
+        const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.comisiones_mp ?? 0), 0)
         const totalGastos = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
 
         return {
