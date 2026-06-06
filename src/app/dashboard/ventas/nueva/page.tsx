@@ -2,7 +2,7 @@
 
 // src/app/dashboard/ventas/nueva/page.tsx
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useNuevaVenta } from '@/hooks/use-nueva-venta'
@@ -309,13 +309,15 @@ function NuevaVentaContent() {
     }
   }, [desdePoint])
 
-  useEffect(() => {
+  const cargarProductos = useCallback(async () => {
     const supabase = createClient()
-    supabase.from('productos_con_margen')
+    const { data } = await supabase.from('productos_con_margen')
       .select('id, nombre, categoria_nombre, stock, costo, precio')
       .eq('estado', 'activo').limit(200)
-      .then(({ data }) => setTodosProds(data ?? []))
+    setTodosProds(data ?? [])
   }, [])
+
+  useEffect(() => { cargarProductos() }, [cargarProductos])
 
   useEffect(() => {
     const supabase = createClient()
@@ -363,6 +365,8 @@ function NuevaVentaContent() {
 
     const pedidoId = await confirmarVenta()
     if (pedidoId === false) return
+
+    cargarProductos()
 
     setTotalConfirmado(montoFinal)
     setPedidoIdConfirmado(pedidoId)
