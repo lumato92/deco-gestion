@@ -295,6 +295,10 @@ function ModalEditar({ venta, onGuardar, onCerrar }: {
   const [canal, setCanal] = useState<CanalVenta>(venta.canal_venta ?? 'directo')
   const [metodo, setMetodo] = useState<MetodoPago>(venta.metodo_pago ?? 'efectivo')
   const [notas, setNotas] = useState(venta.notas ?? '')
+  const [fechaVenta, setFechaVenta] = useState<string>(() => {
+    const d = venta.fecha_confirmacion ?? venta.fecha_pedido
+    return d ? d.split('T')[0] : ''
+  })
   const [fechaEntrega, setFechaEntrega] = useState(venta.fecha_entrega ?? '')
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
@@ -302,11 +306,13 @@ function ModalEditar({ venta, onGuardar, onCerrar }: {
   const handleGuardar = async () => {
     setGuardando(true)
     const supabase = createClient()
+    const fechaVentaISO = fechaVenta ? new Date(fechaVenta + 'T12:00:00').toISOString() : null
     const { error: err } = await supabase.from('pedidos').update({
       estado, canal_venta: canal, metodo_pago: metodo,
       notas: notas.trim() || null,
       fecha_entrega: fechaEntrega || null,
       ...(estado === 'entregado' && !venta.fecha_entrega ? { fecha_entrega: new Date().toISOString() } : {}),
+      ...(fechaVentaISO ? { fecha_pedido: fechaVentaISO, fecha_confirmacion: fechaVentaISO } : {}),
     }).eq('id', venta.id)
     if (err) { setError(err.message); setGuardando(false); return }
     onGuardar()
@@ -351,6 +357,11 @@ function ModalEditar({ venta, onGuardar, onCerrar }: {
               <option value="debito">Débito</option>
               <option value="credito">Crédito</option>
             </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] text-gray-500 uppercase tracking-wide">Fecha de la venta</label>
+            <input type="date" value={fechaVenta} onChange={e => setFechaVenta(e.target.value)}
+              className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:border-teal-400" />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Fecha de entrega</label>
