@@ -265,8 +265,10 @@ export default function GastosPage() {
   } = useGastos()
 
   const [vista, setVista] = useState<'listado' | 'recurrentes'>('listado')
+  const [orden, setOrden] = useState<'recientes' | 'antiguos' | 'mayor' | 'menor'>('recientes')
   const [modalGasto, setModalGasto] = useState<{ open: boolean; gasto?: Gasto }>({ open: false })
   const [modalRecurrente, setModalRecurrente] = useState<{ open: boolean; rec?: GastoRecurrente }>({ open: false })
+  const [gastoEliminar, setGastoEliminar] = useState<Gasto | null>(null)
   const [eliminando, setEliminando] = useState<number | null>(null)
   const [generando, setGenerando] = useState(false)
   const [msgGenerar, setMsgGenerar] = useState<string | null>(null)
@@ -275,11 +277,22 @@ export default function GastosPage() {
   const maxMetodo = Math.max(...Object.values(porMetodo), 1)
   const rangoActivo = !!(filtros.desde || filtros.hasta)
 
-  const handleEliminar = async (id: number) => {
-    if (!confirm('¿Eliminar este gasto?')) return
-    setEliminando(id)
-    await eliminarGasto(id)
+  const gastosOrdenados = [...gastos].sort((a, b) => {
+    switch (orden) {
+      case 'mayor':    return b.monto - a.monto
+      case 'menor':    return a.monto - b.monto
+      case 'antiguos': return a.fecha.localeCompare(b.fecha)
+      case 'recientes':
+      default:         return b.fecha.localeCompare(a.fecha)
+    }
+  })
+
+  const handleEliminar = async () => {
+    if (!gastoEliminar) return
+    setEliminando(gastoEliminar.id)
+    await eliminarGasto(gastoEliminar.id)
     setEliminando(null)
+    setGastoEliminar(null)
   }
 
   const handleGenerar = async () => {
@@ -324,6 +337,31 @@ export default function GastosPage() {
           onGuardar={guardarRecurrente}
           onCerrar={() => setModalRecurrente({ open: false })}
         />
+      )}
+
+      {gastoEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 mb-1">Eliminar gasto</h3>
+              <p className="text-xs text-gray-500">
+                ¿Seguro que querés eliminar <span className="font-medium text-gray-700">{gastoEliminar.descripcion}</span> por {formatMonto(gastoEliminar.monto)}? Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setGastoEliminar(null)}
+                disabled={eliminando === gastoEliminar.id}
+                className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-50">
+                Cancelar
+              </button>
+              <button onClick={handleEliminar}
+                disabled={eliminando === gastoEliminar.id}
+                className="flex-1 py-2 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+                {eliminando === gastoEliminar.id ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Topbar */}
@@ -433,9 +471,12 @@ export default function GastosPage() {
               <span className="text-xs text-gray-400">
                 {loading ? 'Cargando...' : `${gastos.length} gastos · ${formatMonto(gastos.reduce((s, g) => s + g.monto, 0))}`}
               </span>
-              <select className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-600">
-                <option>Más recientes primero</option>
-                <option>Mayor monto</option>
+              <select value={orden} onChange={e => setOrden(e.target.value as typeof orden)}
+                className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-600 focus:outline-none focus:border-teal-400">
+                <option value="recientes">Más recientes</option>
+                <option value="antiguos">Más antiguos</option>
+                <option value="mayor">Mayor a menor</option>
+                <option value="menor">Menor a mayor</option>
               </select>
             </div>
             <table className="w-full text-[12px]">
@@ -467,7 +508,7 @@ export default function GastosPage() {
                         </td>
                       </tr>
                     )
-                    : gastos.map(g => {
+                    : gastosOrdenados.map(g => {
                         const mp = MP_CFG[g.metodo_pago]
                         return (
                           <tr key={g.id} className="border-t border-gray-100 hover:bg-gray-50">
@@ -496,7 +537,7 @@ export default function GastosPage() {
                                   className="text-[11px] px-2 py-1 border border-gray-200 rounded text-gray-500 hover:bg-gray-50">
                                   Editar
                                 </button>
-                                <button onClick={() => handleEliminar(g.id)}
+                                <button onClick={() => setGastoEliminar(g)}
                                   disabled={eliminando === g.id}
                                   className="text-[11px] px-2 py-1 border border-gray-200 rounded text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 disabled:opacity-50">
                                   {eliminando === g.id ? '...' : '×'}
