@@ -273,6 +273,7 @@ export default function GastosPage() {
   const [mpActivo, setMpActivo] = useState<string | null>(null)
 
   const maxMetodo = Math.max(...Object.values(porMetodo), 1)
+  const rangoActivo = !!(filtros.desde || filtros.hasta)
 
   const handleEliminar = async (id: number) => {
     if (!confirm('¿Eliminar este gasto?')) return
@@ -352,9 +353,9 @@ export default function GastosPage() {
       {/* Métricas */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Total del mes',    valor: totalMes,                      sub: `${todos.length} gastos` },
-          { label: 'Salió de caja',    valor: porMetodo.efectivo + porMetodo.debito,  sub: 'efectivo + débito' },
-          { label: 'Salió del banco',  valor: porMetodo.transferencia + porMetodo.credito, sub: 'transf. + crédito' },
+          { label: rangoActivo ? 'Total del período' : 'Total del mes',    valor: totalMes,                      sub: `${todos.length} gastos` },
+          { label: 'Salió de caja',    valor: porMetodo.efectivo,  sub: 'efectivo' },
+          { label: 'Salió del banco',  valor: porMetodo.transferencia + porMetodo.debito + porMetodo.credito, sub: 'transf. + débito + crédito' },
           { label: 'Gastos fijos',     valor: todos.filter(g => g.recurrente).reduce((s, g) => s + g.monto, 0), sub: 'recurrentes del mes' },
         ].map(m => (
           <div key={m.label} className="bg-gray-100 rounded-lg px-4 py-3">

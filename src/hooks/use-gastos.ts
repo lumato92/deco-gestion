@@ -63,16 +63,22 @@ export function useGastos() {
     const supabase = createClient()
     setLoading(true)
 
-    // Primer día del mes actual
+    // Por defecto se muestra el mes actual. Si el usuario define un rango
+    // de fechas (desde/hasta), la consulta lo respeta para poder ver meses
+    // anteriores, no solo filtrar lo ya traído.
     const hoy = new Date()
     const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
+    const desde = filtros.desde || primerDiaMes
+
+    let gastosQuery = supabase
+      .from('gastos')
+      .select('*')
+      .gte('fecha', desde)
+    if (filtros.hasta) gastosQuery = gastosQuery.lte('fecha', filtros.hasta)
+    gastosQuery = gastosQuery.order('fecha', { ascending: false })
 
     const [gastosRes, recurrentesRes] = await Promise.all([
-      supabase
-        .from('gastos')
-        .select('*')
-        .gte('fecha', primerDiaMes)
-        .order('fecha', { ascending: false }),
+      gastosQuery,
       supabase
         .from('gastos_recurrentes')
         .select('*')
@@ -84,7 +90,7 @@ export function useGastos() {
 
     setRecurrentes(recurrentesRes.data ?? [])
     setLoading(false)
-  }, [])
+  }, [filtros.desde, filtros.hasta])
 
   useEffect(() => { fetchGastos() }, [fetchGastos])
 
