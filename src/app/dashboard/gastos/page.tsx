@@ -257,6 +257,7 @@ export default function GastosPage() {
   const {
     gastos, todos, recurrentes,
     totalMes, porMetodo,
+    mostrandoRecientes,
     loading, error,
     filtros, setFiltros, limpiarFiltros,
     crearGasto, editarGasto, eliminarGasto,
@@ -391,7 +392,7 @@ export default function GastosPage() {
       {/* Métricas */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: rangoActivo ? 'Total del período' : 'Total del mes',    valor: totalMes,                      sub: `${todos.length} gastos` },
+          { label: rangoActivo ? 'Total del período' : mostrandoRecientes ? 'Últimos gastos' : 'Total del mes',    valor: totalMes,                      sub: `${todos.length} gastos` },
           { label: 'Salió de caja',    valor: porMetodo.efectivo,  sub: 'efectivo' },
           { label: 'Salió del banco',  valor: porMetodo.transferencia + porMetodo.debito + porMetodo.credito, sub: 'transf. + débito + crédito' },
           { label: 'Gastos fijos',     valor: todos.filter(g => g.recurrente).reduce((s, g) => s + g.monto, 0), sub: 'recurrentes del mes' },
@@ -469,7 +470,12 @@ export default function GastosPage() {
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <span className="text-xs text-gray-400">
-                {loading ? 'Cargando...' : `${gastos.length} gastos · ${formatMonto(gastos.reduce((s, g) => s + g.monto, 0))}`}
+                {loading
+                  ? 'Cargando...'
+                  : `${gastos.length} gastos · ${formatMonto(gastos.reduce((s, g) => s + g.monto, 0))}`}
+                {!loading && mostrandoRecientes && (
+                  <span className="ml-2 text-amber-600">· este mes no tiene gastos, mostrando los últimos cargados</span>
+                )}
               </span>
               <select value={orden} onChange={e => setOrden(e.target.value as typeof orden)}
                 className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-600 focus:outline-none focus:border-teal-400">
