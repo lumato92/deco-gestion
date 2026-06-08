@@ -3,7 +3,7 @@
 // src/app/dashboard/finanzas/page.tsx
 
 import {
-  AreaChart, Area, BarChart, Bar,
+  AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend,
 } from 'recharts'
@@ -69,8 +69,11 @@ function MetricaCard({ label, valor, sub, color, loading }: {
 // ── Página ────────────────────────────────────────────────────
 
 export default function FinanzasPage() {
-  const { mesActual, historico, desglosePagos, desgloseGastos, topClientes, loading, error } =
-    useFinanzas()
+  const {
+    mesActual, historico, desglosePagos, desgloseGastos, topClientes,
+    mesSeleccionado, setMesSeleccionado, mesesDisponibles,
+    loading, error,
+  } = useFinanzas()
 
   if (error) return (
     <div className="p-5">
@@ -78,8 +81,13 @@ export default function FinanzasPage() {
     </div>
   )
 
-  const mesLabel = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
   const resultadoPositivo = (mesActual?.resultado_neto ?? 0) >= 0
+
+  // Navegación entre meses (mesesDisponibles está ordenado del más nuevo al más viejo)
+  const idxMes = mesesDisponibles.findIndex(m => m.value === mesSeleccionado)
+  const hayAnterior = idxMes < mesesDisponibles.length - 1
+  const haySiguiente = idxMes > 0
+  const [anioSel, mesNumSel] = mesSeleccionado.split('-')
 
   return (
     <div className="p-5 flex flex-col gap-4">
@@ -88,15 +96,45 @@ export default function FinanzasPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-gray-400 mb-1">Negocio</p>
-          <h1 className="text-base font-medium text-gray-900 capitalize">Finanzas · {mesLabel}</h1>
+          <h1 className="text-base font-medium text-gray-900">Finanzas</h1>
         </div>
-        <a
-          href={`/api/pdf/financiero?mes=${new Date().getMonth() + 1}&anio=${new Date().getFullYear()}`}
-          target="_blank"
-          className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-600 hover:bg-gray-50"
-        >
-          Exportar PDF
-        </a>
+        <div className="flex items-center gap-2">
+          {/* Selector de mes */}
+          <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
+            <button
+              onClick={() => hayAnterior && setMesSeleccionado(mesesDisponibles[idxMes + 1].value)}
+              disabled={!hayAnterior}
+              className="px-2 py-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Mes anterior"
+            >
+              ‹
+            </button>
+            <select
+              value={mesSeleccionado}
+              onChange={e => setMesSeleccionado(e.target.value)}
+              className="text-xs font-medium text-gray-700 px-2 py-1.5 border-x border-gray-200 focus:outline-none capitalize bg-white min-w-[120px] text-center"
+            >
+              {mesesDisponibles.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => haySiguiente && setMesSeleccionado(mesesDisponibles[idxMes - 1].value)}
+              disabled={!haySiguiente}
+              className="px-2 py-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Mes siguiente"
+            >
+              ›
+            </button>
+          </div>
+          <a
+            href={`/api/pdf/financiero?mes=${parseInt(mesNumSel)}&anio=${anioSel}`}
+            target="_blank"
+            className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-600 hover:bg-gray-50"
+          >
+            Exportar PDF
+          </a>
+        </div>
       </div>
 
       {/* Métricas del mes */}
@@ -242,11 +280,10 @@ export default function FinanzasPage() {
                 <Tooltip content={<TooltipCustom />} />
                 <Bar dataKey="resultado_neto" name="Resultado"
                   radius={[3, 3, 0, 0]}
-                  fill="#0F6E56"
                   label={false}
                 >
                   {historico.map((entry, i) => (
-                    <rect key={i} fill={entry.resultado_neto >= 0 ? '#0F6E56' : '#F87171'} />
+                    <Cell key={i} fill={entry.resultado_neto >= 0 ? '#0F6E56' : '#F87171'} />
                   ))}
                 </Bar>
               </BarChart>
