@@ -2,6 +2,7 @@
 
 // src/app/dashboard/finanzas/page.tsx
 
+import { useState } from 'react'
 import {
   AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -26,6 +27,14 @@ const CAT_COLORES: Record<string, string> = {
   Honorarios:  '#3C3489',
   Publicidad:  '#993556',
   Varios:      '#6B7280',
+}
+
+const CANAL_CFG: Record<string, { label: string; color: string }> = {
+  directo:    { label: 'Directo',    color: '#0F6E56' },
+  whatsapp:   { label: 'WhatsApp',   color: '#25D366' },
+  instagram:  { label: 'Instagram',  color: '#993556' },
+  tienda:     { label: 'Tienda',     color: '#185FA5' },
+  'sin canal':{ label: 'Sin canal',  color: '#9CA3AF' },
 }
 
 // ── Tooltip personalizado ─────────────────────────────────────
@@ -71,9 +80,12 @@ function MetricaCard({ label, valor, sub, color, loading }: {
 export default function FinanzasPage() {
   const {
     mesActual, historico, desglosePagos, desgloseGastos, topClientes,
+    topProductos, ventasPorCanal, pedidosConPerdida,
     mesSeleccionado, setMesSeleccionado, mesesDisponibles,
     loading, error,
   } = useFinanzas()
+
+  const [ordenProd, setOrdenProd] = useState<'facturacion' | 'margen'>('facturacion')
 
   if (error) return (
     <div className="p-5">
@@ -82,6 +94,10 @@ export default function FinanzasPage() {
   )
 
   const resultadoPositivo = (mesActual?.resultado_neto ?? 0) >= 0
+
+  const productosOrdenados = [...topProductos]
+    .sort((a, b) => ordenProd === 'margen' ? b.margen - a.margen : b.facturacion - a.facturacion)
+    .slice(0, 8)
 
   // Navegación entre meses (mesesDisponibles está ordenado del más nuevo al más viejo)
   const idxMes = mesesDisponibles.findIndex(m => m.value === mesSeleccionado)
@@ -350,6 +366,123 @@ export default function FinanzasPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Pedidos con pérdida */}
+      {!loading && pedidosConPerdida.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[13px] font-medium text-red-800">
+              ⚠ Pedidos con pérdida ({pedidosConPerdida.length})
+            </span>
+            <span className="text-[11px] text-red-600">vendidos por debajo del costo</span>
+          </div>
+          <div className="flex flex-col divide-y divide-red-100">
+            {pedidosConPerdida.map(p => (
+              <div key={p.id} className="flex items-center justify-between py-2 text-[12px]">
+                <span className="text-gray-700">#{p.id} · {p.cliente_nombre ?? '(sin cliente)'}</span>
+                <div className="flex items-center gap-4">
+                  <span className="text-gray-500">{formatMonto(p.total_cobrado)}</span>
+                  <span className="font-medium text-red-600">{formatMonto(p.ganancia)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fila: top productos + ventas por canal */}
+      <div className="grid grid-cols-3 gap-4">
+
+        {/* Top productos */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-[13px] font-medium text-gray-900">Top productos del mes</div>
+            <div className="flex border border-gray-200 rounded-lg overflow-hidden">
+              <button onClick={() => setOrdenProd('facturacion')}
+                className={`px-2.5 py-1 text-[11px] font-medium ${ordenProd === 'facturacion' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}>
+                Facturación
+              </button>
+              <button onClick={() => setOrdenProd('margen')}
+                className={`px-2.5 py-1 text-[11px] font-medium border-l border-gray-200 ${ordenProd === 'margen' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}>
+                Margen
+              </button>
+            </div>
+          </div>
+          {loading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-7 bg-gray-100 rounded animate-pulse" />
+              ))}
+            </div>
+          ) : productosOrdenados.length === 0 ? (
+            <div className="text-center py-8 text-xs text-gray-400">Sin ventas este mes</div>
+          ) : (
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left pb-2 text-[11px] font-medium text-gray-400">Producto</th>
+                  <th className="text-right pb-2 text-[11px] font-medium text-gray-400 w-16">Unid.</th>
+                  <th className="text-right pb-2 text-[11px] font-medium text-gray-400 w-28">Facturación</th>
+                  <th className="text-right pb-2 text-[11px] font-medium text-gray-400 w-32">Margen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productosOrdenados.map(p => (
+                  <tr key={p.clave} className="border-b border-gray-100 last:border-0">
+                    <td className="py-2 font-medium text-gray-900">{p.nombre}</td>
+                    <td className="py-2 text-right text-gray-600">{p.unidades}</td>
+                    <td className="py-2 text-right font-medium text-gray-900">{formatMonto(p.facturacion)}</td>
+                    <td className="py-2 text-right">
+                      <span className="font-medium text-gray-900">{formatMonto(p.margen)}</span>
+                      <span className={`ml-1.5 text-[11px] ${p.margen_pct >= 40 ? 'text-teal-700' : p.margen_pct >= 20 ? 'text-amber-700' : 'text-red-600'}`}>
+                        {p.margen_pct}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Ventas por canal */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="text-[13px] font-medium text-gray-900 mb-4">Ventas por canal</div>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-8 bg-gray-100 rounded-lg animate-pulse" />
+              ))}
+            </div>
+          ) : ventasPorCanal.length === 0 ? (
+            <div className="text-center py-8 text-xs text-gray-400">Sin ventas este mes</div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {ventasPorCanal.map(c => {
+                const cfg = CANAL_CFG[c.canal] ?? { label: c.canal, color: '#6B7280' }
+                return (
+                  <div key={c.canal}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ background: cfg.color }} />
+                        <span className="text-[12px] text-gray-700 capitalize">{cfg.label}</span>
+                        <span className="text-[11px] text-gray-400">{c.cant} venta{c.cant !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-400">{c.pct}%</span>
+                        <span className="text-[12px] font-medium text-gray-900">{formatMonto(c.total)}</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${c.pct}%`, background: cfg.color }} />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

@@ -35,6 +35,30 @@ export interface TopCliente {
   cant_pedidos: number
 }
 
+export interface TopProducto {
+  clave: string
+  nombre: string
+  unidades: number
+  facturacion: number
+  costo: number
+  margen: number
+  margen_pct: number
+}
+
+export interface VentaCanal {
+  canal: string
+  total: number
+  cant: number
+  pct: number
+}
+
+export interface PedidoPerdida {
+  id: number
+  cliente_nombre: string | null
+  total_cobrado: number
+  ganancia: number
+}
+
 export interface ResumenMesActual {
   ingresos: number
   ganancia_bruta: number
@@ -66,6 +90,7 @@ function labelLargo(ym: string) {
 }
 
 interface PedidoRaw {
+  id: number
   fecha_confirmacion: string | null
   total_cobrado: number | null
   ganancia: number | null
@@ -77,15 +102,24 @@ interface PedidoRaw {
 }
 interface GastoRaw { fecha: string | null; monto: number | null; categoria: string; metodo_pago: string }
 interface PagoRaw { metodo_pago: string; monto: number | null; created_at: string | null }
+interface ItemRaw {
+  producto_id: number | null
+  nombre_producto: string
+  cantidad: number
+  precio_unitario: number
+  costo_unitario: number
+  pedidos: { fecha_confirmacion: string | null; estado: string | null } | null
+}
 
 interface RawData {
   pedidos: PedidoRaw[]
   gastos: GastoRaw[]
   pagos: PagoRaw[]
+  items: ItemRaw[]
 }
 
 export function useFinanzas() {
-  const [raw, setRaw] = useState<RawData>({ pedidos: [], gastos: [], pagos: [] })
+  const [raw, setRaw] = useState<RawData>({ pedidos: [], gastos: [], pagos: [], items: [] })
   const [mesSeleccionado, setMesSeleccionado] = useState<string>(ymActual())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -99,10 +133,10 @@ export function useFinanzas() {
       const inicioVentana = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1)
       const desde = `${inicioVentana.getFullYear()}-${String(inicioVentana.getMonth() + 1).padStart(2, '0')}-01`
 
-      const [pedidosRes, gastosRes, pagosRes] = await Promise.all([
+      const [pedidosRes, gastosRes, pagosRes, itemsRes] = await Promise.all([
         supabase
           .from('pedidos_con_total')
-          .select('fecha_confirmacion, total_cobrado, ganancia, comisiones_mp, cant_items, cliente_nombre, canal_venta, estado')
+          .select('id, fecha_confirmacion, total_cobrado, ganancia, comisiones_mp, cant_items, cliente_nombre, canal_venta, estado')
           .in('estado', ESTADOS_VENTA)
           .gte('fecha_confirmacion', `${desde}`)
           .order('fecha_confirmacion'),
@@ -114,9 +148,14 @@ export function useFinanzas() {
           .from('pagos_pedido')
           .select('metodo_pago, monto, comisiones, created_at')
           .gte('created_at', desde),
+        supabase
+          .from('items_pedido')
+          .select('producto_id, nombre_producto, cantidad, precio_unitario, costo_unitario, pedidos!inner(fecha_confirmacion, estado)')
+          .in('pedidos.estado', ESTADOS_VENTA)
+          .gte('pedidos.fecha_confirmacion', desde),
       ])
 
-      if (pedidosRes.error || gastosRes.error || pagosRes.error) {
+      if (pedidosRes.error || gastosRes.error || pagosRes.error || itemsRes.error) {
         throw new Error('Error al cargar datos financieros')
       }
 
@@ -124,6 +163,7 @@ export function useFinanzas() {
         pedidos: (pedidosRes.data ?? []) as PedidoRaw[],
         gastos: (gastosRes.data ?? []) as GastoRaw[],
         pagos: (pagosRes.data ?? []) as PagoRaw[],
+        items: (itemsRes.data ?? []) as unknown as ItemRaw[],
       })
       setError(null)
     } catch {
@@ -242,12 +282,67 @@ export function useFinanzas() {
       .slice(0, 5)
   }, [raw, mesSeleccionado])
 
+  // ── Top productos (mes seleccionado) ─────────────────────────
+  const topProductos = useMemo<TopProducto[]>(() => {
+    const itemsMes = raw.items.filter(it => it.pedidos?.fecha_confirmacion?.startsWith(mesSeleccionado))
+    const map: Record<string, TopProducto> = {}
+    itemsMes.forEach(it => {
+      const clave = it.producto_id != null ? `p:${it.producto_id}` : `libre:${it.nombre_producto}`
+      if (!map[clave]) {
+        map[clave] = { clave, nombre: it.nombre_producto, unidades: 0, facturacion: 0, costo: 0, margen: 0, margen_pct: 0 }
+      }
+      const fact = it.cantidad * it.precio_unitario
+      const cost = it.cantidad * it.costo_unitario
+      map[clave].unidades += it.cantidad
+      map[clave].facturacion += fact
+      map[clave].costo += cost
+    })
+    return Object.values(map).map(p => ({
+      ...p,
+      margen: p.facturacion - p.costo,
+      margen_pct: p.facturacion > 0 ? Math.round((p.facturacion - p.costo) / p.facturacion * 100) : 0,
+    }))
+  }, [raw, mesSeleccionado])
+
+  // ── Ventas por canal (mes seleccionado) ──────────────────────
+  const ventasPorCanal = useMemo<VentaCanal[]>(() => {
+    const pedidosMes = raw.pedidos.filter(p => p.fecha_confirmacion?.startsWith(mesSeleccionado))
+    const total = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0), 0)
+    const map: Record<string, { total: number; cant: number }> = {}
+    pedidosMes.forEach(p => {
+      const canal = p.canal_venta ?? 'sin canal'
+      if (!map[canal]) map[canal] = { total: 0, cant: 0 }
+      map[canal].total += p.total_cobrado ?? 0
+      map[canal].cant += 1
+    })
+    return Object.entries(map).map(([canal, v]) => ({
+      canal, total: v.total, cant: v.cant,
+      pct: total > 0 ? Math.round(v.total / total * 100) : 0,
+    })).sort((a, b) => b.total - a.total)
+  }, [raw, mesSeleccionado])
+
+  // ── Pedidos con pérdida (mes seleccionado) ───────────────────
+  const pedidosConPerdida = useMemo<PedidoPerdida[]>(() => {
+    return raw.pedidos
+      .filter(p => p.fecha_confirmacion?.startsWith(mesSeleccionado) && (p.ganancia ?? 0) < 0)
+      .map(p => ({
+        id: p.id,
+        cliente_nombre: p.cliente_nombre,
+        total_cobrado: p.total_cobrado ?? 0,
+        ganancia: p.ganancia ?? 0,
+      }))
+      .sort((a, b) => a.ganancia - b.ganancia)
+  }, [raw, mesSeleccionado])
+
   return {
     mesActual,
     historico,
     desglosePagos,
     desgloseGastos,
     topClientes,
+    topProductos,
+    ventasPorCanal,
+    pedidosConPerdida,
     mesSeleccionado,
     setMesSeleccionado,
     mesesDisponibles,
