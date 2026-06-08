@@ -257,6 +257,7 @@ export default function GastosPage() {
   const {
     gastos, todos, recurrentes,
     totalMes, porMetodo,
+    mostrandoRecientes,
     loading, error,
     filtros, setFiltros, limpiarFiltros,
     crearGasto, editarGasto, eliminarGasto,
@@ -265,20 +266,34 @@ export default function GastosPage() {
   } = useGastos()
 
   const [vista, setVista] = useState<'listado' | 'recurrentes'>('listado')
+  const [orden, setOrden] = useState<'recientes' | 'antiguos' | 'mayor' | 'menor'>('recientes')
   const [modalGasto, setModalGasto] = useState<{ open: boolean; gasto?: Gasto }>({ open: false })
   const [modalRecurrente, setModalRecurrente] = useState<{ open: boolean; rec?: GastoRecurrente }>({ open: false })
+  const [gastoEliminar, setGastoEliminar] = useState<Gasto | null>(null)
   const [eliminando, setEliminando] = useState<number | null>(null)
   const [generando, setGenerando] = useState(false)
   const [msgGenerar, setMsgGenerar] = useState<string | null>(null)
   const [mpActivo, setMpActivo] = useState<string | null>(null)
 
   const maxMetodo = Math.max(...Object.values(porMetodo), 1)
+  const rangoActivo = !!(filtros.desde || filtros.hasta)
 
-  const handleEliminar = async (id: number) => {
-    if (!confirm('¿Eliminar este gasto?')) return
-    setEliminando(id)
-    await eliminarGasto(id)
+  const gastosOrdenados = [...gastos].sort((a, b) => {
+    switch (orden) {
+      case 'mayor':    return b.monto - a.monto
+      case 'menor':    return a.monto - b.monto
+      case 'antiguos': return a.fecha.localeCompare(b.fecha)
+      case 'recientes':
+      default:         return b.fecha.localeCompare(a.fecha)
+    }
+  })
+
+  const handleEliminar = async () => {
+    if (!gastoEliminar) return
+    setEliminando(gastoEliminar.id)
+    await eliminarGasto(gastoEliminar.id)
     setEliminando(null)
+    setGastoEliminar(null)
   }
 
   const handleGenerar = async () => {
@@ -325,6 +340,31 @@ export default function GastosPage() {
         />
       )}
 
+      {gastoEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+            <div>
+              <h3 className="text-sm font-medium text-gray-900 mb-1">Eliminar gasto</h3>
+              <p className="text-xs text-gray-500">
+                ¿Seguro que querés eliminar <span className="font-medium text-gray-700">{gastoEliminar.descripcion}</span> por {formatMonto(gastoEliminar.monto)}? Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setGastoEliminar(null)}
+                disabled={eliminando === gastoEliminar.id}
+                className="flex-1 py-2 text-xs border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 disabled:opacity-50">
+                Cancelar
+              </button>
+              <button onClick={handleEliminar}
+                disabled={eliminando === gastoEliminar.id}
+                className="flex-1 py-2 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50">
+                {eliminando === gastoEliminar.id ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Topbar */}
       <div className="flex items-center justify-between">
         <div>
@@ -352,9 +392,9 @@ export default function GastosPage() {
       {/* Métricas */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Total del mes',    valor: totalMes,                      sub: `${todos.length} gastos` },
-          { label: 'Salió de caja',    valor: porMetodo.efectivo + porMetodo.debito,  sub: 'efectivo + débito' },
-          { label: 'Salió del banco',  valor: porMetodo.transferencia + porMetodo.credito, sub: 'transf. + crédito' },
+          { label: rangoActivo ? 'Total del período' : mostrandoRecientes ? 'Últimos gastos' : 'Total del mes',    valor: totalMes,                      sub: `${todos.length} gastos` },
+          { label: 'Salió de caja',    valor: porMetodo.efectivo,  sub: 'efectivo' },
+          { label: 'Salió del banco',  valor: porMetodo.transferencia + porMetodo.debito + porMetodo.credito, sub: 'transf. + débito + crédito' },
           { label: 'Gastos fijos',     valor: todos.filter(g => g.recurrente).reduce((s, g) => s + g.monto, 0), sub: 'recurrentes del mes' },
         ].map(m => (
           <div key={m.label} className="bg-gray-100 rounded-lg px-4 py-3">
@@ -430,11 +470,19 @@ export default function GastosPage() {
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <span className="text-xs text-gray-400">
-                {loading ? 'Cargando...' : `${gastos.length} gastos · ${formatMonto(gastos.reduce((s, g) => s + g.monto, 0))}`}
+                {loading
+                  ? 'Cargando...'
+                  : `${gastos.length} gastos · ${formatMonto(gastos.reduce((s, g) => s + g.monto, 0))}`}
+                {!loading && mostrandoRecientes && (
+                  <span className="ml-2 text-amber-600">· este mes no tiene gastos, mostrando los últimos cargados</span>
+                )}
               </span>
-              <select className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-600">
-                <option>Más recientes primero</option>
-                <option>Mayor monto</option>
+              <select value={orden} onChange={e => setOrden(e.target.value as typeof orden)}
+                className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-gray-600 focus:outline-none focus:border-teal-400">
+                <option value="recientes">Más recientes</option>
+                <option value="antiguos">Más antiguos</option>
+                <option value="mayor">Mayor a menor</option>
+                <option value="menor">Menor a mayor</option>
               </select>
             </div>
             <table className="w-full text-[12px]">
@@ -466,7 +514,7 @@ export default function GastosPage() {
                         </td>
                       </tr>
                     )
-                    : gastos.map(g => {
+                    : gastosOrdenados.map(g => {
                         const mp = MP_CFG[g.metodo_pago]
                         return (
                           <tr key={g.id} className="border-t border-gray-100 hover:bg-gray-50">
@@ -495,7 +543,7 @@ export default function GastosPage() {
                                   className="text-[11px] px-2 py-1 border border-gray-200 rounded text-gray-500 hover:bg-gray-50">
                                   Editar
                                 </button>
-                                <button onClick={() => handleEliminar(g.id)}
+                                <button onClick={() => setGastoEliminar(g)}
                                   disabled={eliminando === g.id}
                                   className="text-[11px] px-2 py-1 border border-gray-200 rounded text-gray-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 disabled:opacity-50">
                                   {eliminando === g.id ? '...' : '×'}

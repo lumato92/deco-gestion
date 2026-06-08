@@ -58,33 +58,68 @@ export function useGastos() {
   const [filtros, setFiltrosState] = useState<FiltrosGastos>(FILTROS_INICIALES)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // true cuando el mes actual no tenía gastos y mostramos los últimos cargados
+  const [mostrandoRecientes, setMostrandoRecientes] = useState(false)
 
   const fetchGastos = useCallback(async () => {
     const supabase = createClient()
     setLoading(true)
 
-    // Primer día del mes actual
+    const recurrentesPromise = supabase
+      .from('gastos_recurrentes')
+      .select('*')
+      .order('dia_del_mes')
+
+    const hayFiltroFecha = !!(filtros.desde || filtros.hasta)
+
+    // Caso 1: el usuario definió un rango → la consulta lo respeta tal cual.
+    if (hayFiltroFecha) {
+      let q = supabase.from('gastos').select('*').gte('fecha', filtros.desde || '1900-01-01')
+      if (filtros.hasta) q = q.lte('fecha', filtros.hasta)
+      q = q.order('fecha', { ascending: false })
+
+      const [gastosRes, recurrentesRes] = await Promise.all([q, recurrentesPromise])
+      if (gastosRes.error) setError('Error al cargar gastos')
+      else { setTodos(gastosRes.data ?? []); setError(null) }
+      setMostrandoRecientes(false)
+      setRecurrentes(recurrentesRes.data ?? [])
+      setLoading(false)
+      return
+    }
+
+    // Caso 2: sin filtro → intentamos el mes actual.
     const hoy = new Date()
     const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
 
-    const [gastosRes, recurrentesRes] = await Promise.all([
-      supabase
+    const [mesRes, recurrentesRes] = await Promise.all([
+      supabase.from('gastos').select('*').gte('fecha', primerDiaMes).order('fecha', { ascending: false }),
+      recurrentesPromise,
+    ])
+    setRecurrentes(recurrentesRes.data ?? [])
+
+    if (mesRes.error) {
+      setError('Error al cargar gastos')
+      setLoading(false)
+      return
+    }
+
+    if ((mesRes.data?.length ?? 0) > 0) {
+      // El mes actual tiene gastos → comportamiento normal.
+      setTodos(mesRes.data ?? [])
+      setMostrandoRecientes(false)
+    } else {
+      // El mes actual está vacío → mostramos los últimos gastos cargados.
+      const { data: recientes } = await supabase
         .from('gastos')
         .select('*')
-        .gte('fecha', primerDiaMes)
-        .order('fecha', { ascending: false }),
-      supabase
-        .from('gastos_recurrentes')
-        .select('*')
-        .order('dia_del_mes'),
-    ])
-
-    if (gastosRes.error) setError('Error al cargar gastos')
-    else setTodos(gastosRes.data ?? [])
-
-    setRecurrentes(recurrentesRes.data ?? [])
+        .order('fecha', { ascending: false })
+        .limit(50)
+      setTodos(recientes ?? [])
+      setMostrandoRecientes((recientes?.length ?? 0) > 0)
+    }
+    setError(null)
     setLoading(false)
-  }, [])
+  }, [filtros.desde, filtros.hasta])
 
   useEffect(() => { fetchGastos() }, [fetchGastos])
 
@@ -189,6 +224,7 @@ export function useGastos() {
   return {
     gastos, todos, recurrentes,
     totalMes, porMetodo,
+    mostrandoRecientes,
     loading, error,
     filtros, setFiltros, limpiarFiltros,
     crearGasto, editarGasto, eliminarGasto,
