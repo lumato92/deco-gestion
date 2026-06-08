@@ -89,6 +89,9 @@ export interface ResumenMesActual {
   resultado_neto: number
   cant_pedidos: number
   margen_pct: number
+  margen_neto_pct: number
+  ticket_promedio: number
+  comisiones_mp: number
 }
 
 export interface MesOpcion {
@@ -110,6 +113,36 @@ function ymActual() {
 function labelLargo(ym: string) {
   const [anio, mes] = ym.split('-')
   return `${MESES_LARGO[parseInt(mes) - 1]} ${anio}`
+}
+
+function ymAnterior(ym: string) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 2, 1) // m-1 es el mes actual (0-index), -1 más = anterior
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function calcResumen(pedidos: PedidoRaw[], gastos: GastoRaw[], ym: string): ResumenMesActual {
+  const pedidosMes = pedidos.filter(p => p.fecha_confirmacion?.startsWith(ym))
+  const gastosMes = gastos.filter(g => g.fecha?.startsWith(ym))
+
+  const comisiones = pedidosMes.reduce((s, p) => s + (p.comisiones_mp ?? 0), 0)
+  const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.comisiones_mp ?? 0), 0)
+  const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.comisiones_mp ?? 0), 0)
+  const totalGastos = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
+  const resultado = ganancia - totalGastos
+  const cant = pedidosMes.length
+
+  return {
+    ingresos,
+    ganancia_bruta: ganancia,
+    total_gastos: totalGastos,
+    resultado_neto: resultado,
+    cant_pedidos: cant,
+    margen_pct: ingresos > 0 ? Math.round(ganancia / ingresos * 100) : 0,
+    margen_neto_pct: ingresos > 0 ? Math.round(resultado / ingresos * 100) : 0,
+    ticket_promedio: cant > 0 ? Math.round(ingresos / cant) : 0,
+    comisiones_mp: comisiones,
+  }
 }
 
 interface PedidoRaw {
@@ -288,24 +321,15 @@ export function useFinanzas() {
     })
   }, [raw])
 
-  // ── Resumen del mes seleccionado ─────────────────────────────
-  const mesActual = useMemo<ResumenMesActual>(() => {
-    const pedidosMes = raw.pedidos.filter(p => p.fecha_confirmacion?.startsWith(mesSeleccionado))
-    const gastosMes = raw.gastos.filter(g => g.fecha?.startsWith(mesSeleccionado))
-
-    const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.comisiones_mp ?? 0), 0)
-    const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.comisiones_mp ?? 0), 0)
-    const totalGastos = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
-
-    return {
-      ingresos,
-      ganancia_bruta: ganancia,
-      total_gastos: totalGastos,
-      resultado_neto: ganancia - totalGastos,
-      cant_pedidos: pedidosMes.length,
-      margen_pct: ingresos > 0 ? Math.round(ganancia / ingresos * 100) : 0,
-    }
-  }, [raw, mesSeleccionado])
+  // ── Resumen del mes seleccionado y del anterior ──────────────
+  const mesActual = useMemo<ResumenMesActual>(
+    () => calcResumen(raw.pedidos, raw.gastos, mesSeleccionado),
+    [raw, mesSeleccionado]
+  )
+  const mesAnterior = useMemo<ResumenMesActual>(
+    () => calcResumen(raw.pedidos, raw.gastos, ymAnterior(mesSeleccionado)),
+    [raw, mesSeleccionado]
+  )
 
   // ── Desglose por método de pago (mes seleccionado) ───────────
   const desglosePagos = useMemo<DesglosePago[]>(() => {
@@ -427,6 +451,7 @@ export function useFinanzas() {
 
   return {
     mesActual,
+    mesAnterior,
     historico,
     desglosePagos,
     desgloseGastos,

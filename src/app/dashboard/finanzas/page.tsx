@@ -55,19 +55,37 @@ function TooltipCustom({ active, payload, label }: any) {
   )
 }
 
+// ── Badge de comparación vs mes anterior ─────────────────────
+
+function DeltaBadge({ delta, inverso }: { delta: number | null; inverso?: boolean }) {
+  if (delta === null) return null
+  if (delta === 0) return <span className="text-[11px] text-gray-400">= 0%</span>
+  const subio = delta > 0
+  const bueno = inverso ? !subio : subio
+  return (
+    <span className={`text-[11px] font-medium ${bueno ? 'text-teal-600' : 'text-red-500'}`}>
+      {subio ? '▲' : '▼'} {Math.abs(delta)}%
+    </span>
+  )
+}
+
 // ── Métrica card ─────────────────────────────────────────────
 
-function MetricaCard({ label, valor, sub, color, loading }: {
+function MetricaCard({ label, valor, sub, color, loading, delta, deltaInverso, esMonto = true }: {
   label: string; valor: number; sub: string
   color?: string; loading: boolean
+  delta?: number | null; deltaInverso?: boolean; esMonto?: boolean
 }) {
   return (
     <div className="bg-gray-100 rounded-lg px-4 py-3">
-      <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">{label}</div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="text-[11px] text-gray-400 uppercase tracking-wide">{label}</div>
+        {!loading && delta !== undefined && <DeltaBadge delta={delta} inverso={deltaInverso} />}
+      </div>
       {loading
         ? <div className="h-7 w-24 bg-gray-200 rounded animate-pulse" />
         : <div className={`text-xl font-medium ${color ?? 'text-gray-900'}`}>
-            {formatMonto(valor)}
+            {esMonto ? formatMonto(valor) : `${valor}%`}
           </div>
       }
       <div className="text-[11px] text-gray-400 mt-1">{sub}</div>
@@ -79,12 +97,16 @@ function MetricaCard({ label, valor, sub, color, loading }: {
 
 export default function FinanzasPage() {
   const {
-    mesActual, historico, desglosePagos, desgloseGastos, topClientes,
+    mesActual, mesAnterior, historico, desglosePagos, desgloseGastos, topClientes,
     topProductos, ventasPorCanal, pedidosConPerdida,
     cuentasPorCobrar, inventario, flujoFondos,
     mesSeleccionado, setMesSeleccionado, mesesDisponibles,
     loading, error,
   } = useFinanzas()
+
+  // % de variación vs mes anterior (null si el mes anterior fue 0)
+  const delta = (actual: number, anterior: number): number | null =>
+    anterior === 0 ? null : Math.round((actual - anterior) / Math.abs(anterior) * 100)
 
   const [ordenProd, setOrdenProd] = useState<'facturacion' | 'margen' | 'unidades'>('facturacion')
 
@@ -158,34 +180,37 @@ export default function FinanzasPage() {
         </div>
       </div>
 
-      {/* Métricas del mes */}
-      <div className="grid grid-cols-5 gap-3">
-        <MetricaCard label="Ingresos"       valor={mesActual?.ingresos ?? 0}       sub={`${mesActual?.cant_pedidos ?? 0} ventas`}        loading={loading} />
-        <MetricaCard label="Ganancia bruta" valor={mesActual?.ganancia_bruta ?? 0} sub={`${mesActual?.margen_pct ?? 0}% de margen`}      loading={loading} />
-        <MetricaCard label="Gastos"         valor={mesActual?.total_gastos ?? 0}   sub="operativos del mes"                              loading={loading} />
-        <MetricaCard
-          label="Resultado neto"
-          valor={mesActual?.resultado_neto ?? 0}
+      {/* Métricas del mes — fila 1 (montos, con comparación vs mes anterior) */}
+      <div className="grid grid-cols-4 gap-3">
+        <MetricaCard label="Ingresos" valor={mesActual.ingresos}
+          sub={`${mesActual.cant_pedidos} ventas`} loading={loading}
+          delta={delta(mesActual.ingresos, mesAnterior.ingresos)} />
+        <MetricaCard label="Ganancia bruta" valor={mesActual.ganancia_bruta}
+          sub={`${mesActual.margen_pct}% de margen`} loading={loading}
+          delta={delta(mesActual.ganancia_bruta, mesAnterior.ganancia_bruta)} />
+        <MetricaCard label="Gastos" valor={mesActual.total_gastos}
+          sub="operativos del mes" loading={loading}
+          delta={delta(mesActual.total_gastos, mesAnterior.total_gastos)} deltaInverso />
+        <MetricaCard label="Resultado neto" valor={mesActual.resultado_neto}
           sub={resultadoPositivo ? 'positivo' : 'negativo'}
-          color={resultadoPositivo ? 'text-teal-700' : 'text-red-600'}
-          loading={loading}
-        />
-        <div className="bg-gray-100 rounded-lg px-4 py-3">
-          <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Margen</div>
-          {loading
-            ? <div className="h-7 w-16 bg-gray-200 rounded animate-pulse" />
-            : (
-              <div className={`text-xl font-medium ${
-                (mesActual?.margen_pct ?? 0) >= 40 ? 'text-teal-700'
-                : (mesActual?.margen_pct ?? 0) >= 20 ? 'text-amber-700'
-                : 'text-red-600'
-              }`}>
-                {mesActual?.margen_pct ?? 0}%
-              </div>
-            )
-          }
-          <div className="text-[11px] text-gray-400 mt-1">ganancia / ingresos</div>
-        </div>
+          color={resultadoPositivo ? 'text-teal-700' : 'text-red-600'} loading={loading}
+          delta={delta(mesActual.resultado_neto, mesAnterior.resultado_neto)} />
+      </div>
+
+      {/* Métricas del mes — fila 2 (ratios y costos) */}
+      <div className="grid grid-cols-4 gap-3">
+        <MetricaCard label="Margen bruto" valor={mesActual.margen_pct} esMonto={false}
+          sub="ganancia / ingresos" loading={loading}
+          color={mesActual.margen_pct >= 40 ? 'text-teal-700' : mesActual.margen_pct >= 20 ? 'text-amber-700' : 'text-red-600'} />
+        <MetricaCard label="Margen neto" valor={mesActual.margen_neto_pct} esMonto={false}
+          sub="resultado / ingresos" loading={loading}
+          color={mesActual.margen_neto_pct >= 0 ? 'text-teal-700' : 'text-red-600'} />
+        <MetricaCard label="Ticket promedio" valor={mesActual.ticket_promedio}
+          sub="ingreso por venta" loading={loading}
+          delta={delta(mesActual.ticket_promedio, mesAnterior.ticket_promedio)} />
+        <MetricaCard label="Comisiones MP" valor={mesActual.comisiones_mp}
+          sub="retenido por Mercado Pago" loading={loading}
+          delta={delta(mesActual.comisiones_mp, mesAnterior.comisiones_mp)} deltaInverso />
       </div>
 
       {/* Gráfico histórico — área */}
