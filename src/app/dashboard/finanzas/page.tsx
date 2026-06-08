@@ -81,6 +81,7 @@ export default function FinanzasPage() {
   const {
     mesActual, historico, desglosePagos, desgloseGastos, topClientes,
     topProductos, ventasPorCanal, pedidosConPerdida,
+    cuentasPorCobrar, inventario, flujoFondos,
     mesSeleccionado, setMesSeleccionado, mesesDisponibles,
     loading, error,
   } = useFinanzas()
@@ -371,6 +372,102 @@ export default function FinanzasPage() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Tesorería: cuentas por cobrar · caja vs banco · inventario */}
+      <div className="grid grid-cols-3 gap-4">
+
+        {/* Cuentas por cobrar */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[13px] font-medium text-gray-900">Cuentas por cobrar</div>
+            <span className="text-[10px] text-gray-400">al día de hoy</span>
+          </div>
+          {loading ? (
+            <div className="h-28 bg-gray-50 rounded-lg animate-pulse" />
+          ) : (
+            <>
+              <div className="text-xl font-medium text-gray-900">{formatMonto(cuentasPorCobrar.total)}</div>
+              <div className="text-[11px] text-gray-400 mt-1 mb-3">
+                {cuentasPorCobrar.cantidad} pedido{cuentasPorCobrar.cantidad !== 1 ? 's' : ''} con saldo
+              </div>
+              {cuentasPorCobrar.total > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  {([
+                    { k: 'reciente', label: '0–30 días',  val: cuentasPorCobrar.aging.reciente, cls: 'text-teal-700' },
+                    { k: 'medio',    label: '31–60 días', val: cuentasPorCobrar.aging.medio,    cls: 'text-amber-700' },
+                    { k: 'vencido',  label: '+60 días',   val: cuentasPorCobrar.aging.vencido,  cls: 'text-red-600' },
+                  ] as const).map(b => (
+                    <div key={b.k} className="flex items-center justify-between text-[12px]">
+                      <span className="text-gray-500">{b.label}</span>
+                      <span className={`font-medium ${b.val > 0 ? b.cls : 'text-gray-400'}`}>{formatMonto(b.val)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Caja vs Banco */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="text-[13px] font-medium text-gray-900 mb-3">Flujo de fondos del mes</div>
+          {loading ? (
+            <div className="h-28 bg-gray-50 rounded-lg animate-pulse" />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { label: 'Caja',  hint: 'efectivo', f: flujoFondos.caja },
+                { label: 'Banco', hint: 'transf./tarjetas/MP', f: flujoFondos.banco },
+              ] as const).map(c => (
+                <div key={c.label} className="border border-gray-100 rounded-lg p-3">
+                  <div className="text-[12px] font-medium text-gray-700">{c.label}</div>
+                  <div className="text-[10px] text-gray-400 mb-2">{c.hint}</div>
+                  <div className="flex justify-between text-[11px] mb-0.5">
+                    <span className="text-gray-500">Entró</span>
+                    <span className="text-teal-700 font-medium">{formatMonto(c.f.entra)}</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] mb-1.5">
+                    <span className="text-gray-500">Salió</span>
+                    <span className="text-red-600 font-medium">{formatMonto(c.f.sale)}</span>
+                  </div>
+                  <div className="flex justify-between text-[12px] pt-1.5 border-t border-gray-100">
+                    <span className="text-gray-600">Neto</span>
+                    <span className={`font-medium ${c.f.neto >= 0 ? 'text-teal-700' : 'text-red-600'}`}>
+                      {c.f.neto >= 0 ? '' : '−'}{formatMonto(Math.abs(c.f.neto))}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Valor de inventario */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[13px] font-medium text-gray-900">Valor de inventario</div>
+            <span className="text-[10px] text-gray-400">al día de hoy</span>
+          </div>
+          {loading ? (
+            <div className="h-28 bg-gray-50 rounded-lg animate-pulse" />
+          ) : (
+            <>
+              <div className="text-xl font-medium text-gray-900">{formatMonto(inventario.valor)}</div>
+              <div className="text-[11px] text-gray-400 mt-1">capital inmovilizado en stock</div>
+              <div className="flex items-center gap-4 mt-4 pt-3 border-t border-gray-100">
+                <div>
+                  <div className="text-[15px] font-medium text-gray-900">{inventario.unidades}</div>
+                  <div className="text-[11px] text-gray-400">unidades</div>
+                </div>
+                <div>
+                  <div className="text-[15px] font-medium text-gray-900">{inventario.productos}</div>
+                  <div className="text-[11px] text-gray-400">productos activos</div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

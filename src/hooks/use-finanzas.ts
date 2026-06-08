@@ -59,6 +59,29 @@ export interface PedidoPerdida {
   ganancia: number
 }
 
+export interface CuentaCobrar {
+  id: number
+  cliente_nombre: string | null
+  pendiente: number
+  dias: number
+}
+
+export interface CuentasPorCobrar {
+  total: number
+  cantidad: number
+  cuentas: CuentaCobrar[]
+  aging: { reciente: number; medio: number; vencido: number } // 0-30 / 31-60 / +60 días
+}
+
+export interface FlujoCuenta { entra: number; sale: number; neto: number }
+export interface FlujoFondos { caja: FlujoCuenta; banco: FlujoCuenta }
+
+export interface InventarioResumen {
+  valor: number
+  unidades: number
+  productos: number
+}
+
 export interface ResumenMesActual {
   ingresos: number
   ganancia_bruta: number
@@ -101,7 +124,7 @@ interface PedidoRaw {
   estado: string | null
 }
 interface GastoRaw { fecha: string | null; monto: number | null; categoria: string; metodo_pago: string }
-interface PagoRaw { metodo_pago: string; monto: number | null; created_at: string | null }
+interface PagoRaw { metodo_pago: string; monto: number | null; comisiones: number | null; created_at: string | null }
 interface ItemRaw {
   producto_id: number | null
   nombre_producto: string
@@ -123,6 +146,11 @@ export function useFinanzas() {
   const [mesSeleccionado, setMesSeleccionado] = useState<string>(ymActual())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Snapshots "al día de hoy" (no dependen del mes seleccionado)
+  const [cuentasPorCobrar, setCuentasPorCobrar] = useState<CuentasPorCobrar>({
+    total: 0, cantidad: 0, cuentas: [], aging: { reciente: 0, medio: 0, vencido: 0 },
+  })
+  const [inventario, setInventario] = useState<InventarioResumen>({ valor: 0, unidades: 0, productos: 0 })
 
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
@@ -133,7 +161,7 @@ export function useFinanzas() {
       const inicioVentana = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1)
       const desde = `${inicioVentana.getFullYear()}-${String(inicioVentana.getMonth() + 1).padStart(2, '0')}-01`
 
-      const [pedidosRes, gastosRes, pagosRes, itemsRes] = await Promise.all([
+      const [pedidosRes, gastosRes, pagosRes, itemsRes, cobrarRes, prodRes] = await Promise.all([
         supabase
           .from('pedidos_con_total')
           .select('id, fecha_confirmacion, total_cobrado, ganancia, comisiones_mp, cant_items, cliente_nombre, canal_venta, estado')
@@ -153,9 +181,22 @@ export function useFinanzas() {
           .select('producto_id, nombre_producto, cantidad, precio_unitario, costo_unitario, pedidos!inner(fecha_confirmacion, estado)')
           .in('pedidos.estado', ESTADOS_VENTA)
           .gte('pedidos.fecha_confirmacion', desde),
+        // Snapshot: cuentas por cobrar (pedidos abiertos con saldo real).
+        // Se excluye 'entregado' (ya saldado; sus saldos son residuos de
+        // redondeo) y se usa un umbral > 1 para descartar esos centavos.
+        supabase
+          .from('pedidos_con_total')
+          .select('id, cliente_nombre, pendiente, fecha_confirmacion, fecha_pedido, estado')
+          .in('estado', ['confirmado', 'reservado', 'en_fabricacion'])
+          .gt('pendiente', 1),
+        // Snapshot: inventario valorizado
+        supabase
+          .from('productos')
+          .select('stock, costo')
+          .eq('estado', 'activo'),
       ])
 
-      if (pedidosRes.error || gastosRes.error || pagosRes.error || itemsRes.error) {
+      if (pedidosRes.error || gastosRes.error || pagosRes.error || itemsRes.error || cobrarRes.error || prodRes.error) {
         throw new Error('Error al cargar datos financieros')
       }
 
@@ -165,6 +206,35 @@ export function useFinanzas() {
         pagos: (pagosRes.data ?? []) as PagoRaw[],
         items: (itemsRes.data ?? []) as unknown as ItemRaw[],
       })
+
+      // ── Cuentas por cobrar (snapshot) ──────────────────────────
+      const ahora = Date.now()
+      const cuentas: CuentaCobrar[] = (cobrarRes.data ?? []).map((c: any) => {
+        const ref = c.fecha_confirmacion ?? c.fecha_pedido
+        const dias = ref ? Math.floor((ahora - new Date(ref).getTime()) / 86400000) : 0
+        return { id: c.id, cliente_nombre: c.cliente_nombre, pendiente: c.pendiente ?? 0, dias }
+      }).sort((a, b) => b.dias - a.dias)
+      const aging = cuentas.reduce((acc, c) => {
+        if (c.dias <= 30) acc.reciente += c.pendiente
+        else if (c.dias <= 60) acc.medio += c.pendiente
+        else acc.vencido += c.pendiente
+        return acc
+      }, { reciente: 0, medio: 0, vencido: 0 })
+      setCuentasPorCobrar({
+        total: cuentas.reduce((s, c) => s + c.pendiente, 0),
+        cantidad: cuentas.length,
+        cuentas,
+        aging,
+      })
+
+      // ── Inventario valorizado (snapshot) ───────────────────────
+      const prods = (prodRes.data ?? []) as { stock: number | null; costo: number | null }[]
+      setInventario({
+        valor: prods.reduce((s, p) => s + (p.stock ?? 0) * (p.costo ?? 0), 0),
+        unidades: prods.reduce((s, p) => s + (p.stock ?? 0), 0),
+        productos: prods.length,
+      })
+
       setError(null)
     } catch {
       setError('Error al cargar datos financieros')
@@ -334,6 +404,27 @@ export function useFinanzas() {
       .sort((a, b) => a.ganancia - b.ganancia)
   }, [raw, mesSeleccionado])
 
+  // ── Flujo de fondos: caja vs banco (mes seleccionado) ────────
+  const flujoFondos = useMemo<FlujoFondos>(() => {
+    const esCaja = (m: string) => m === 'efectivo'
+    const pagosMes = raw.pagos.filter(p => p.created_at?.startsWith(mesSeleccionado))
+    const gastosMes = raw.gastos.filter(g => g.fecha?.startsWith(mesSeleccionado))
+
+    // Entradas: lo realmente acreditado (neto de comisiones de MP)
+    const entraCaja = pagosMes.filter(p => esCaja(p.metodo_pago))
+      .reduce((s, p) => s + ((p.monto ?? 0) - (p.comisiones ?? 0)), 0)
+    const entraBanco = pagosMes.filter(p => !esCaja(p.metodo_pago))
+      .reduce((s, p) => s + ((p.monto ?? 0) - (p.comisiones ?? 0)), 0)
+    // Salidas: gastos por tipo de fondo
+    const saleCaja = gastosMes.filter(g => esCaja(g.metodo_pago)).reduce((s, g) => s + (g.monto ?? 0), 0)
+    const saleBanco = gastosMes.filter(g => !esCaja(g.metodo_pago)).reduce((s, g) => s + (g.monto ?? 0), 0)
+
+    return {
+      caja: { entra: entraCaja, sale: saleCaja, neto: entraCaja - saleCaja },
+      banco: { entra: entraBanco, sale: saleBanco, neto: entraBanco - saleBanco },
+    }
+  }, [raw, mesSeleccionado])
+
   return {
     mesActual,
     historico,
@@ -343,6 +434,9 @@ export function useFinanzas() {
     topProductos,
     ventasPorCanal,
     pedidosConPerdida,
+    cuentasPorCobrar,
+    inventario,
+    flujoFondos,
     mesSeleccionado,
     setMesSeleccionado,
     mesesDisponibles,
