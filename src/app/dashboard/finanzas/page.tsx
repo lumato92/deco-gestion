@@ -85,7 +85,7 @@ export default function FinanzasPage() {
     loading, error,
   } = useFinanzas()
 
-  const [ordenProd, setOrdenProd] = useState<'facturacion' | 'margen'>('facturacion')
+  const [ordenProd, setOrdenProd] = useState<'facturacion' | 'margen' | 'unidades'>('facturacion')
 
   if (error) return (
     <div className="p-5">
@@ -96,7 +96,11 @@ export default function FinanzasPage() {
   const resultadoPositivo = (mesActual?.resultado_neto ?? 0) >= 0
 
   const productosOrdenados = [...topProductos]
-    .sort((a, b) => ordenProd === 'margen' ? b.margen - a.margen : b.facturacion - a.facturacion)
+    .sort((a, b) => {
+      if (ordenProd === 'margen') return b.margen - a.margen
+      if (ordenProd === 'unidades') return b.unidades - a.unidades
+      return b.facturacion - a.facturacion
+    })
     .slice(0, 8)
 
   // Navegación entre meses (mesesDisponibles está ordenado del más nuevo al más viejo)
@@ -409,6 +413,10 @@ export default function FinanzasPage() {
               <button onClick={() => setOrdenProd('margen')}
                 className={`px-2.5 py-1 text-[11px] font-medium border-l border-gray-200 ${ordenProd === 'margen' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}>
                 Margen
+              </button>
+              <button onClick={() => setOrdenProd('unidades')}
+                className={`px-2.5 py-1 text-[11px] font-medium border-l border-gray-200 ${ordenProd === 'unidades' ? 'bg-gray-200 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}>
+                Cantidad
               </button>
             </div>
           </div>
