@@ -66,7 +66,7 @@ function ModalGasto({ gasto, onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-md flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-md flex flex-col gap-4">
         <h3 className="text-sm font-medium text-gray-900">
           {gasto ? 'Editar gasto' : 'Cargar gasto'}
         </h3>
@@ -187,7 +187,7 @@ function ModalRecurrente({ recurrente, onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <h3 className="text-sm font-medium text-gray-900">
           {recurrente ? 'Editar plantilla' : 'Nueva plantilla recurrente'}
         </h3>
@@ -246,7 +246,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       <div style={{
         width: 14, height: 14, top: 2,
         left: on ? 16 : 2, position: 'absolute',
-      }} className="rounded-full bg-white transition-all" />
+      }} className="rounded-full bg-surface transition-all" />
     </button>
   )
 }
@@ -342,7 +342,7 @@ export default function GastosPage() {
 
       {gastoEliminar && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+          <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-1">Eliminar gasto</h3>
               <p className="text-xs text-gray-500">
@@ -419,7 +419,7 @@ export default function GastosPage() {
               return (
                 <button key={key} onClick={() => filtrarMetodo(key)}
                   className={`text-left p-3 rounded-lg border transition-colors ${
-                    mpActivo === key ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                    mpActivo === key ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-surface hover:border-gray-300'
                   }`}>
                   <div className="text-[11px] text-gray-500 mb-1">{cfg.label}</div>
                   <div className="text-[15px] font-medium text-gray-900">{formatMonto(monto)}</div>
@@ -434,7 +434,7 @@ export default function GastosPage() {
           </div>
 
           {/* Filtros */}
-          <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+          <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
             <input type="text" placeholder="Buscar descripción o proveedor..."
               value={filtros.busqueda} onChange={e => setFiltros({ busqueda: e.target.value })}
               className="flex-1 min-w-[160px] text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
@@ -467,7 +467,7 @@ export default function GastosPage() {
           )}
 
           {/* Tabla */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <span className="text-xs text-gray-400">
                 {loading
@@ -582,7 +582,7 @@ export default function GastosPage() {
           </div>
 
           {/* Lista recurrentes */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <span className="text-[13px] font-medium text-gray-900">Plantillas de gastos fijos</span>
               <button onClick={() => setModalRecurrente({ open: true })}

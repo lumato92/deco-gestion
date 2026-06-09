@@ -117,7 +117,7 @@ export default function EditarPedidoPage() {
           <h1 className="text-base font-medium text-gray-900">Editar pedido</h1>
         </div>
         <button onClick={() => router.back()}
-          className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-500 hover:bg-gray-50">
+          className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-surface text-gray-500 hover:bg-gray-50">
           Cancelar
         </button>
       </div>
@@ -125,7 +125,7 @@ export default function EditarPedidoPage() {
       <div className="grid grid-cols-[1fr_300px] gap-4 items-start">
 
         {/* IZQUIERDA — artículos */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-[13px] font-medium text-gray-900">Artículos del pedido</div>
             {!panelAgregar && (
@@ -138,7 +138,7 @@ export default function EditarPedidoPage() {
               <div className="flex gap-1.5">
                 {(['insumo', 'producto', 'otro'] as const).map(t => (
                   <button key={t} onClick={() => setTipoNueva(t)}
-                    className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg border transition-colors ${tipoNueva === t ? 'border-purple-500 bg-white text-purple-800' : 'border-gray-200 text-gray-500 bg-white hover:border-gray-300'}`}>
+                    className={`flex-1 py-1.5 text-[11px] font-medium rounded-lg border transition-colors ${tipoNueva === t ? 'border-purple-500 bg-surface text-purple-800' : 'border-gray-200 text-gray-500 bg-surface hover:border-gray-300'}`}>
                     {t === 'insumo' ? 'Insumo' : t === 'producto' ? 'Producto' : 'Otro'}
                   </button>
                 ))}
@@ -146,7 +146,7 @@ export default function EditarPedidoPage() {
               {tipoNueva === 'otro' ? (
                 <div className="flex gap-2">
                   <input type="text" placeholder="Nombre..." value={nombreLibre} onChange={e => setNombreLibre(e.target.value)}
-                    className="flex-1 text-sm bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                    className="flex-1 text-sm bg-surface border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                   <button onClick={() => { if (nombreLibre.trim()) agregarLinea(null, 'otro', nombreLibre.trim()) }}
                     disabled={!nombreLibre.trim()}
                     className="px-3 py-1.5 text-[11px] font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">
@@ -187,12 +187,12 @@ export default function EditarPedidoPage() {
                     <td className="px-3 py-2 text-center">
                       <input type="number" min={1} step={0.01} value={l.cantidad_pedida}
                         onChange={e => setLineas(prev => prev.map((x, j) => j === i ? { ...x, cantidad_pedida: Number(e.target.value) } : x))}
-                        className="w-20 text-center text-[12px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                        className="w-20 text-center text-[12px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                     </td>
                     <td className="px-3 py-2 text-right">
                       <input type="number" min={0} value={l.precio_unitario}
                         onChange={e => setLineas(prev => prev.map((x, j) => j === i ? { ...x, precio_unitario: Number(e.target.value) } : x))}
-                        className="w-28 text-right text-[12px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                        className="w-28 text-right text-[12px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                     </td>
                     <td className="px-3 py-2 text-right font-medium text-gray-900">
                       {formatMonto(l.cantidad_pedida * l.precio_unitario)}
@@ -210,7 +210,7 @@ export default function EditarPedidoPage() {
 
         {/* DERECHA */}
         <div className="flex flex-col gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
             <div className="text-[13px] font-medium text-gray-900">Datos del pedido</div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[11px] text-gray-500 uppercase tracking-wide">Fecha</label>
@@ -228,7 +228,7 @@ export default function EditarPedidoPage() {
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
             <div className="flex justify-between text-[13px]">
               <span className="text-gray-600">Total del pedido</span>
               <span className="text-xl font-medium text-gray-900">{formatMonto(total)}</span>

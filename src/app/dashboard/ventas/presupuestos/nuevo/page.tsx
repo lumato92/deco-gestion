@@ -59,7 +59,7 @@ function ModalNuevoCliente({ onGuardar, onCancelar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <h3 className="text-sm font-medium text-gray-900">Nuevo cliente</h3>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
@@ -249,7 +249,7 @@ export default function NuevoPresupuestoPage() {
         <div className="flex flex-col gap-4">
 
           {/* Cliente */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="text-[13px] font-medium text-gray-900">
                 Cliente
@@ -288,7 +288,7 @@ export default function NuevoPresupuestoPage() {
                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
                   />
                   {resultadosCli.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
                       {resultadosCli.map(c => (
                         <button key={c.id} onClick={() => seleccionarCliente(c)}
                           className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0">
@@ -320,7 +320,7 @@ export default function NuevoPresupuestoPage() {
           </div>
 
           {/* Productos */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Productos</div>
             <div className="relative mb-3">
               <input
@@ -331,7 +331,7 @@ export default function NuevoPresupuestoPage() {
                 className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
               />
               {resultadosProd.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-sm z-10 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg shadow-sm z-10 overflow-hidden">
                   {resultadosProd.map(p => (
                     <button key={p.id}
                       onClick={() => {
@@ -402,12 +402,12 @@ export default function NuevoPresupuestoPage() {
                         <td className="py-2">
                           <input type="number" min={1} value={item.cantidad}
                             onChange={e => actualizarItem(idx, { cantidad: Number(e.target.value) })}
-                            className="w-full text-center text-[13px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                            className="w-full text-center text-[13px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                         </td>
                         <td className="py-2">
                           <input type="number" min={0} value={item.precio_unitario}
                             onChange={e => actualizarItem(idx, { precio_unitario: Number(e.target.value) })}
-                            className="w-full text-right text-[13px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                            className="w-full text-right text-[13px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                         </td>
                         <td className="py-2 text-right font-medium text-gray-900">
                           {formatMonto(item.cantidad * item.precio_unitario)}
@@ -434,7 +434,7 @@ export default function NuevoPresupuestoPage() {
                     <input type="number" min={0} value={form.descuento_valor || ''}
                       onChange={e => setForm({ descuento_valor: Number(e.target.value) })}
                       placeholder="0"
-                      className="w-20 text-right text-[13px] text-gray-900 bg-white border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400" />
+                      className="w-20 text-right text-[13px] text-gray-900 bg-surface border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400" />
                     {form.descuento_valor > 0 && (
                       <span className="text-[11px] text-gray-500">
                         {form.descuento_tipo === 'pct'
@@ -449,7 +449,7 @@ export default function NuevoPresupuestoPage() {
           </div>
 
           {/* Detalles */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Detalles</div>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="flex flex-col gap-1.5">
@@ -482,7 +482,7 @@ export default function NuevoPresupuestoPage() {
         <div className="flex flex-col gap-4">
 
           {/* Tipo de entrega */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Tipo de entrega</div>
             <div className="flex flex-col gap-2">
               {[
@@ -515,7 +515,7 @@ export default function NuevoPresupuestoPage() {
           </div>
 
           {/* Totales y guardar */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-[12px]">
                 <span className="text-gray-600">Subtotal</span>

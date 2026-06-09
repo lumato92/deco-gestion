@@ -1,26 +1,48 @@
 @import "tailwindcss";
 
+/* Estrategia de dark mode por clase (.dark en <html>) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Token de superficie: reemplaza a bg-white en tarjetas/paneles */
+@theme {
+  --color-surface: #ffffff;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ──────────────────────────────────────────────────────────────
+   MODO OSCURO
+   Se redefinen los tokens de superficie y se remapea la escala de
+   grises de Tailwind, de modo que todas las páginas que usan
+   text-gray-*, bg-gray-* y border-gray-* se oscurecen sin tocarlas.
+   (text-white se mantiene para el texto sobre botones de color.)
+   ────────────────────────────────────────────────────────────── */
+html.dark {
+  --background: #0c0f11;
+  --foreground: #e6edf3;
+
+  --color-surface: #15191c;
+
+  --color-gray-50:  #0c0f11;
+  --color-gray-100: #1b2024;
+  --color-gray-200: #2a3138;
+  --color-gray-300: #3a424a;
+  --color-gray-400: #6b747e;
+  --color-gray-500: #8b95a0;
+  --color-gray-600: #aab4bc;
+  --color-gray-700: #c2cbd3;
+  --color-gray-800: #d8e0e6;
+  --color-gray-900: #e6edf3;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background-color .2s ease, color .2s ease;
 }
