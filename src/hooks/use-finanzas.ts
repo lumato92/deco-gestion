@@ -2,7 +2,7 @@
 
 // src/hooks/use-finanzas.ts
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 
@@ -35,174 +35,244 @@ export interface TopCliente {
   cant_pedidos: number
 }
 
-export interface FinanzasData {
-  mesActual: {
-    ingresos: number
-    ganancia_bruta: number
-    total_gastos: number
-    resultado_neto: number
-    cant_pedidos: number
-    margen_pct: number
-  } | null
-  historico: ResumenMes[]
-  desglosePagos: DesglosePago[]
-  desgloseGastos: DesgloseCategoriaGasto[]
-  topClientes: TopCliente[]
-  loading: boolean
-  error: string | null
+export interface TopProducto {
+  clave: string
+  nombre: string
+  unidades: number
+  facturacion: number
+  costo: number
+  margen: number
+  margen_pct: number
 }
 
+export interface VentaCanal {
+  canal: string
+  total: number
+  cant: number
+  pct: number
+}
+
+export interface PedidoPerdida {
+  id: number
+  cliente_nombre: string | null
+  total_cobrado: number
+  ganancia: number
+}
+
+export interface CuentaCobrar {
+  id: number
+  cliente_nombre: string | null
+  pendiente: number
+  dias: number
+}
+
+export interface CuentasPorCobrar {
+  total: number
+  cantidad: number
+  cuentas: CuentaCobrar[]
+  aging: { reciente: number; medio: number; vencido: number } // 0-30 / 31-60 / +60 días
+}
+
+export interface FlujoCuenta { entra: number; sale: number; neto: number }
+export interface FlujoFondos { caja: FlujoCuenta; banco: FlujoCuenta }
+
+export interface InventarioResumen {
+  valor: number
+  unidades: number
+  productos: number
+}
+
+export interface ResumenMesActual {
+  ingresos: number
+  ganancia_bruta: number
+  total_gastos: number
+  resultado_neto: number
+  cant_pedidos: number
+  margen_pct: number
+  margen_neto_pct: number
+  ticket_promedio: number
+  comisiones_mp: number
+}
+
+export interface MesOpcion {
+  value: string   // 'YYYY-MM'
+  label: string   // 'Junio 2026'
+}
+
+// Estados que cuentan como venta concretada para finanzas.
+const ESTADOS_VENTA = ['confirmado', 'reservado', 'en_fabricacion', 'entregado']
+
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MESES_LARGO = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
+function ymActual() {
+  const hoy = new Date()
+  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+}
+
+function labelLargo(ym: string) {
+  const [anio, mes] = ym.split('-')
+  return `${MESES_LARGO[parseInt(mes) - 1]} ${anio}`
+}
+
+function ymAnterior(ym: string) {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 2, 1) // m-1 es el mes actual (0-index), -1 más = anterior
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function calcResumen(pedidos: PedidoRaw[], gastos: GastoRaw[], ym: string): ResumenMesActual {
+  const pedidosMes = pedidos.filter(p => p.fecha_confirmacion?.startsWith(ym))
+  const gastosMes = gastos.filter(g => g.fecha?.startsWith(ym))
+
+  const comisiones = pedidosMes.reduce((s, p) => s + (p.comisiones_mp ?? 0), 0)
+  const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.comisiones_mp ?? 0), 0)
+  const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.comisiones_mp ?? 0), 0)
+  const totalGastos = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
+  const resultado = ganancia - totalGastos
+  const cant = pedidosMes.length
+
+  return {
+    ingresos,
+    ganancia_bruta: ganancia,
+    total_gastos: totalGastos,
+    resultado_neto: resultado,
+    cant_pedidos: cant,
+    margen_pct: ingresos > 0 ? Math.round(ganancia / ingresos * 100) : 0,
+    margen_neto_pct: ingresos > 0 ? Math.round(resultado / ingresos * 100) : 0,
+    ticket_promedio: cant > 0 ? Math.round(ingresos / cant) : 0,
+    comisiones_mp: comisiones,
+  }
+}
+
+interface PedidoRaw {
+  id: number
+  fecha_confirmacion: string | null
+  total_cobrado: number | null
+  ganancia: number | null
+  comisiones_mp: number | null
+  cant_items: number | null
+  cliente_nombre: string | null
+  canal_venta: string | null
+  estado: string | null
+}
+interface GastoRaw { fecha: string | null; monto: number | null; categoria: string; metodo_pago: string }
+interface PagoRaw { metodo_pago: string; monto: number | null; comisiones: number | null; created_at: string | null }
+interface ItemRaw {
+  producto_id: number | null
+  nombre_producto: string
+  cantidad: number
+  precio_unitario: number
+  costo_unitario: number
+  pedidos: { fecha_confirmacion: string | null; estado: string | null } | null
+}
+
+interface RawData {
+  pedidos: PedidoRaw[]
+  gastos: GastoRaw[]
+  pagos: PagoRaw[]
+  items: ItemRaw[]
+}
 
 export function useFinanzas() {
-  const [data, setData] = useState<FinanzasData>({
-    mesActual: null,
-    historico: [],
-    desglosePagos: [],
-    desgloseGastos: [],
-    topClientes: [],
-    loading: true,
-    error: null,
+  const [raw, setRaw] = useState<RawData>({ pedidos: [], gastos: [], pagos: [], items: [] })
+  const [mesSeleccionado, setMesSeleccionado] = useState<string>(ymActual())
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  // Snapshots "al día de hoy" (no dependen del mes seleccionado)
+  const [cuentasPorCobrar, setCuentasPorCobrar] = useState<CuentasPorCobrar>({
+    total: 0, cantidad: 0, cuentas: [], aging: { reciente: 0, medio: 0, vencido: 0 },
   })
+  const [inventario, setInventario] = useState<InventarioResumen>({ valor: 0, unidades: 0, productos: 0 })
 
   const fetchAll = useCallback(async () => {
     const supabase = createClient()
-
+    setLoading(true)
     try {
+      // Ventana de 12 meses hacia atrás
       const hoy = new Date()
-      const anio = hoy.getFullYear()
+      const inicioVentana = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1)
+      const desde = `${inicioVentana.getFullYear()}-${String(inicioVentana.getMonth() + 1).padStart(2, '0')}-01`
 
-      // Últimos 6 meses para el histórico
-      const mesesQuery = Array.from({ length: 6 }, (_, i) => {
-        const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      }).reverse()
+      const [pedidosRes, gastosRes, pagosRes, itemsRes, cobrarRes, prodRes] = await Promise.all([
+        supabase
+          .from('pedidos_con_total')
+          .select('id, fecha_confirmacion, total_cobrado, ganancia, comisiones_mp, cant_items, cliente_nombre, canal_venta, estado')
+          .in('estado', ESTADOS_VENTA)
+          .gte('fecha_confirmacion', `${desde}`)
+          .order('fecha_confirmacion'),
+        supabase
+          .from('gastos')
+          .select('fecha, monto, categoria, metodo_pago')
+          .gte('fecha', desde),
+        supabase
+          .from('pagos_pedido')
+          .select('metodo_pago, monto, comisiones, created_at')
+          .gte('created_at', desde),
+        supabase
+          .from('items_pedido')
+          .select('producto_id, nombre_producto, cantidad, precio_unitario, costo_unitario, pedidos!inner(fecha_confirmacion, estado)')
+          .in('pedidos.estado', ESTADOS_VENTA)
+          .gte('pedidos.fecha_confirmacion', desde),
+        // Snapshot: cuentas por cobrar (pedidos abiertos con saldo real).
+        // Se excluye 'entregado' (ya saldado; sus saldos son residuos de
+        // redondeo) y se usa un umbral > 1 para descartar esos centavos.
+        supabase
+          .from('pedidos_con_total')
+          .select('id, cliente_nombre, pendiente, fecha_confirmacion, fecha_pedido, estado')
+          .in('estado', ['confirmado', 'reservado', 'en_fabricacion'])
+          .gt('pendiente', 1),
+        // Snapshot: inventario valorizado
+        supabase
+          .from('productos')
+          .select('stock, costo')
+          .eq('estado', 'activo'),
+      ])
 
-      const [mesActualRes, pedidosHistRes, gastosHistRes, desglosePagosRes, topClientesRes] =
-        await Promise.all([
-          // Resumen mes actual
-          supabase.from('resumen_financiero_mes').select('*').single(),
+      if (pedidosRes.error || gastosRes.error || pagosRes.error || itemsRes.error || cobrarRes.error || prodRes.error) {
+        throw new Error('Error al cargar datos financieros')
+      }
 
-          // Pedidos de los últimos 6 meses
-          supabase
-            .from('pedidos_con_total')
-            .select('fecha_confirmacion, total_cobrado, ganancia, comisiones_mp, cant_items')
-            .eq('estado', 'entregado')
-            .gte('fecha_confirmacion', `${mesesQuery[0]}-01`)
-            .order('fecha_confirmacion'),
-
-          // Gastos de los últimos 6 meses
-          supabase
-            .from('gastos')
-            .select('fecha, monto, categoria, metodo_pago')
-            .gte('fecha', `${mesesQuery[0]}-01`),
-
-          // Desglose por método de pago (mes actual)
-          supabase
-            .from('pagos_pedido')
-            .select('metodo_pago, monto')
-            .gte('created_at', `${mesesQuery[mesesQuery.length - 1]}-01`),
-
-          // Top clientes del mes
-          supabase
-            .from('pedidos_con_total')
-            .select('cliente_nombre, total_cobrado')
-            .not('estado', 'eq', 'cancelado')
-            .not('estado', 'eq', 'presupuesto')
-            .not('cliente_nombre', 'is', null)
-            .gte('fecha_confirmacion', `${mesesQuery[mesesQuery.length - 1]}-01`)
-            .order('total_cobrado', { ascending: false })
-            .limit(5),
-        ])
-
-      // Armar histórico por mes
-      const pedidos = pedidosHistRes.data ?? []
-      const gastos = gastosHistRes.data ?? []
-
-      const historico: ResumenMes[] = mesesQuery.map(mes => {
-        const [anioStr, mesStr] = mes.split('-')
-        const mesIdx = parseInt(mesStr) - 1
-        const label = MESES[mesIdx]
-
-        const pedidosMes = pedidos.filter(p =>
-          p.fecha_confirmacion?.startsWith(mes)
-        )
-        const gastosMes = gastos.filter(g => g.fecha?.startsWith(mes))
-
-        // El ingreso y la ganancia se muestran netos de comisiones de MP.
-        const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.comisiones_mp ?? 0), 0)
-        const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.comisiones_mp ?? 0), 0)
-        const totalGastos = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
-
-        return {
-          mes, mes_label: label,
-          ingresos, ganancia_bruta: ganancia,
-          total_gastos: totalGastos,
-          resultado_neto: ganancia - totalGastos,
-          cant_pedidos: pedidosMes.length,
-        }
+      setRaw({
+        pedidos: (pedidosRes.data ?? []) as PedidoRaw[],
+        gastos: (gastosRes.data ?? []) as GastoRaw[],
+        pagos: (pagosRes.data ?? []) as PagoRaw[],
+        items: (itemsRes.data ?? []) as unknown as ItemRaw[],
       })
 
-      // Desglose por método de pago
-      const pagos = desglosePagosRes.data ?? []
-      const totalPagos = pagos.reduce((s, p) => s + p.monto, 0)
-      const metodosMap: Record<string, { total: number; cant: number }> = {}
-      pagos.forEach(p => {
-        if (!metodosMap[p.metodo_pago]) metodosMap[p.metodo_pago] = { total: 0, cant: 0 }
-        metodosMap[p.metodo_pago].total += p.monto
-        metodosMap[p.metodo_pago].cant += 1
+      // ── Cuentas por cobrar (snapshot) ──────────────────────────
+      const ahora = Date.now()
+      const cuentas: CuentaCobrar[] = (cobrarRes.data ?? []).map((c: any) => {
+        const ref = c.fecha_confirmacion ?? c.fecha_pedido
+        const dias = ref ? Math.floor((ahora - new Date(ref).getTime()) / 86400000) : 0
+        return { id: c.id, cliente_nombre: c.cliente_nombre, pendiente: c.pendiente ?? 0, dias }
+      }).sort((a, b) => b.dias - a.dias)
+      const aging = cuentas.reduce((acc, c) => {
+        if (c.dias <= 30) acc.reciente += c.pendiente
+        else if (c.dias <= 60) acc.medio += c.pendiente
+        else acc.vencido += c.pendiente
+        return acc
+      }, { reciente: 0, medio: 0, vencido: 0 })
+      setCuentasPorCobrar({
+        total: cuentas.reduce((s, c) => s + c.pendiente, 0),
+        cantidad: cuentas.length,
+        cuentas,
+        aging,
       })
-      const desglosePagos: DesglosePago[] = Object.entries(metodosMap).map(([metodo, v]) => ({
-        metodo, total: v.total, cant: v.cant,
-        pct: totalPagos > 0 ? Math.round(v.total / totalPagos * 100) : 0,
-      })).sort((a, b) => b.total - a.total)
 
-      // Desglose gastos por categoría (mes actual)
-      const mesActualStr = `${anio}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
-      const gastosMesActual = gastos.filter(g => g.fecha?.startsWith(mesActualStr))
-      const totalGastosMes = gastosMesActual.reduce((s, g) => s + g.monto, 0)
-      const catMap: Record<string, number> = {}
-      gastosMesActual.forEach(g => {
-        catMap[g.categoria] = (catMap[g.categoria] ?? 0) + g.monto
+      // ── Inventario valorizado (snapshot) ───────────────────────
+      const prods = (prodRes.data ?? []) as { stock: number | null; costo: number | null }[]
+      setInventario({
+        valor: prods.reduce((s, p) => s + (p.stock ?? 0) * (p.costo ?? 0), 0),
+        unidades: prods.reduce((s, p) => s + (p.stock ?? 0), 0),
+        productos: prods.length,
       })
-      const desgloseGastos: DesgloseCategoriaGasto[] = Object.entries(catMap)
-        .map(([categoria, total]) => ({
-          categoria, total,
-          pct: totalGastosMes > 0 ? Math.round(total / totalGastosMes * 100) : 0,
-        }))
-        .sort((a, b) => b.total - a.total)
 
-      // Top clientes
-      const clientesMap: Record<string, { total: number; cant: number }> = {}
-      ;(topClientesRes.data ?? []).forEach((p: any) => {
-        const nombre = p.cliente_nombre
-        if (!clientesMap[nombre]) clientesMap[nombre] = { total: 0, cant: 0 }
-        clientesMap[nombre].total += p.total_cobrado
-        clientesMap[nombre].cant += 1
-      })
-      const topClientes: TopCliente[] = Object.entries(clientesMap)
-        .map(([cliente_nombre, v]) => ({
-          cliente_nombre, total_compras: v.total, cant_pedidos: v.cant,
-        }))
-        .sort((a, b) => b.total_compras - a.total_compras)
-        .slice(0, 5)
-
-      const resumen = mesActualRes.data
-      const margen = resumen?.ingresos > 0
-        ? Math.round(resumen.ganancia_bruta / resumen.ingresos * 100)
-        : 0
-
-      setData({
-        mesActual: resumen ? { ...resumen, margen_pct: margen } : null,
-        historico,
-        desglosePagos,
-        desgloseGastos,
-        topClientes,
-        loading: false,
-        error: null,
-      })
-    } catch (e) {
-      setData(prev => ({ ...prev, loading: false, error: 'Error al cargar datos financieros' }))
+      setError(null)
+    } catch {
+      setError('Error al cargar datos financieros')
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -213,5 +283,189 @@ export function useFinanzas() {
     onCambio: fetchAll,
   })
 
-  return data
+  // ── Meses disponibles para el selector (últimos 12) ──────────
+  const mesesDisponibles = useMemo<MesOpcion[]>(() => {
+    const hoy = new Date()
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)
+      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      return { value, label: labelLargo(value) }
+    })
+  }, [])
+
+  // ── Histórico (últimos 6 meses) para los gráficos ────────────
+  const historico = useMemo<ResumenMes[]>(() => {
+    const hoy = new Date()
+    const meses = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    }).reverse()
+
+    return meses.map(mes => {
+      const mesIdx = parseInt(mes.split('-')[1]) - 1
+      const pedidosMes = raw.pedidos.filter(p => p.fecha_confirmacion?.startsWith(mes))
+      const gastosMes = raw.gastos.filter(g => g.fecha?.startsWith(mes))
+
+      // Ingreso y ganancia netos de comisiones de MP
+      const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.comisiones_mp ?? 0), 0)
+      const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.comisiones_mp ?? 0), 0)
+      const totalGastos = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
+
+      return {
+        mes, mes_label: MESES[mesIdx],
+        ingresos, ganancia_bruta: ganancia,
+        total_gastos: totalGastos,
+        resultado_neto: ganancia - totalGastos,
+        cant_pedidos: pedidosMes.length,
+      }
+    })
+  }, [raw])
+
+  // ── Resumen del mes seleccionado y del anterior ──────────────
+  const mesActual = useMemo<ResumenMesActual>(
+    () => calcResumen(raw.pedidos, raw.gastos, mesSeleccionado),
+    [raw, mesSeleccionado]
+  )
+  const mesAnterior = useMemo<ResumenMesActual>(
+    () => calcResumen(raw.pedidos, raw.gastos, ymAnterior(mesSeleccionado)),
+    [raw, mesSeleccionado]
+  )
+
+  // ── Desglose por método de pago (mes seleccionado) ───────────
+  const desglosePagos = useMemo<DesglosePago[]>(() => {
+    const pagosMes = raw.pagos.filter(p => p.created_at?.startsWith(mesSeleccionado))
+    const total = pagosMes.reduce((s, p) => s + (p.monto ?? 0), 0)
+    const map: Record<string, { total: number; cant: number }> = {}
+    pagosMes.forEach(p => {
+      if (!map[p.metodo_pago]) map[p.metodo_pago] = { total: 0, cant: 0 }
+      map[p.metodo_pago].total += p.monto ?? 0
+      map[p.metodo_pago].cant += 1
+    })
+    return Object.entries(map).map(([metodo, v]) => ({
+      metodo, total: v.total, cant: v.cant,
+      pct: total > 0 ? Math.round(v.total / total * 100) : 0,
+    })).sort((a, b) => b.total - a.total)
+  }, [raw, mesSeleccionado])
+
+  // ── Gastos por categoría (mes seleccionado) ──────────────────
+  const desgloseGastos = useMemo<DesgloseCategoriaGasto[]>(() => {
+    const gastosMes = raw.gastos.filter(g => g.fecha?.startsWith(mesSeleccionado))
+    const total = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
+    const map: Record<string, number> = {}
+    gastosMes.forEach(g => { map[g.categoria] = (map[g.categoria] ?? 0) + (g.monto ?? 0) })
+    return Object.entries(map)
+      .map(([categoria, t]) => ({ categoria, total: t, pct: total > 0 ? Math.round(t / total * 100) : 0 }))
+      .sort((a, b) => b.total - a.total)
+  }, [raw, mesSeleccionado])
+
+  // ── Top clientes (mes seleccionado) ──────────────────────────
+  const topClientes = useMemo<TopCliente[]>(() => {
+    const pedidosMes = raw.pedidos.filter(p =>
+      p.fecha_confirmacion?.startsWith(mesSeleccionado) && p.cliente_nombre
+    )
+    const map: Record<string, { total: number; cant: number }> = {}
+    pedidosMes.forEach(p => {
+      const nombre = p.cliente_nombre as string
+      if (!map[nombre]) map[nombre] = { total: 0, cant: 0 }
+      map[nombre].total += p.total_cobrado ?? 0
+      map[nombre].cant += 1
+    })
+    return Object.entries(map)
+      .map(([cliente_nombre, v]) => ({ cliente_nombre, total_compras: v.total, cant_pedidos: v.cant }))
+      .sort((a, b) => b.total_compras - a.total_compras)
+      .slice(0, 5)
+  }, [raw, mesSeleccionado])
+
+  // ── Top productos (mes seleccionado) ─────────────────────────
+  const topProductos = useMemo<TopProducto[]>(() => {
+    const itemsMes = raw.items.filter(it => it.pedidos?.fecha_confirmacion?.startsWith(mesSeleccionado))
+    const map: Record<string, TopProducto> = {}
+    itemsMes.forEach(it => {
+      const clave = it.producto_id != null ? `p:${it.producto_id}` : `libre:${it.nombre_producto}`
+      if (!map[clave]) {
+        map[clave] = { clave, nombre: it.nombre_producto, unidades: 0, facturacion: 0, costo: 0, margen: 0, margen_pct: 0 }
+      }
+      const fact = it.cantidad * it.precio_unitario
+      const cost = it.cantidad * it.costo_unitario
+      map[clave].unidades += it.cantidad
+      map[clave].facturacion += fact
+      map[clave].costo += cost
+    })
+    return Object.values(map).map(p => ({
+      ...p,
+      margen: p.facturacion - p.costo,
+      margen_pct: p.facturacion > 0 ? Math.round((p.facturacion - p.costo) / p.facturacion * 100) : 0,
+    }))
+  }, [raw, mesSeleccionado])
+
+  // ── Ventas por canal (mes seleccionado) ──────────────────────
+  const ventasPorCanal = useMemo<VentaCanal[]>(() => {
+    const pedidosMes = raw.pedidos.filter(p => p.fecha_confirmacion?.startsWith(mesSeleccionado))
+    const total = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0), 0)
+    const map: Record<string, { total: number; cant: number }> = {}
+    pedidosMes.forEach(p => {
+      const canal = p.canal_venta ?? 'sin canal'
+      if (!map[canal]) map[canal] = { total: 0, cant: 0 }
+      map[canal].total += p.total_cobrado ?? 0
+      map[canal].cant += 1
+    })
+    return Object.entries(map).map(([canal, v]) => ({
+      canal, total: v.total, cant: v.cant,
+      pct: total > 0 ? Math.round(v.total / total * 100) : 0,
+    })).sort((a, b) => b.total - a.total)
+  }, [raw, mesSeleccionado])
+
+  // ── Pedidos con pérdida (mes seleccionado) ───────────────────
+  const pedidosConPerdida = useMemo<PedidoPerdida[]>(() => {
+    return raw.pedidos
+      .filter(p => p.fecha_confirmacion?.startsWith(mesSeleccionado) && (p.ganancia ?? 0) < 0)
+      .map(p => ({
+        id: p.id,
+        cliente_nombre: p.cliente_nombre,
+        total_cobrado: p.total_cobrado ?? 0,
+        ganancia: p.ganancia ?? 0,
+      }))
+      .sort((a, b) => a.ganancia - b.ganancia)
+  }, [raw, mesSeleccionado])
+
+  // ── Flujo de fondos: caja vs banco (mes seleccionado) ────────
+  const flujoFondos = useMemo<FlujoFondos>(() => {
+    const esCaja = (m: string) => m === 'efectivo'
+    const pagosMes = raw.pagos.filter(p => p.created_at?.startsWith(mesSeleccionado))
+    const gastosMes = raw.gastos.filter(g => g.fecha?.startsWith(mesSeleccionado))
+
+    // Entradas: lo realmente acreditado (neto de comisiones de MP)
+    const entraCaja = pagosMes.filter(p => esCaja(p.metodo_pago))
+      .reduce((s, p) => s + ((p.monto ?? 0) - (p.comisiones ?? 0)), 0)
+    const entraBanco = pagosMes.filter(p => !esCaja(p.metodo_pago))
+      .reduce((s, p) => s + ((p.monto ?? 0) - (p.comisiones ?? 0)), 0)
+    // Salidas: gastos por tipo de fondo
+    const saleCaja = gastosMes.filter(g => esCaja(g.metodo_pago)).reduce((s, g) => s + (g.monto ?? 0), 0)
+    const saleBanco = gastosMes.filter(g => !esCaja(g.metodo_pago)).reduce((s, g) => s + (g.monto ?? 0), 0)
+
+    return {
+      caja: { entra: entraCaja, sale: saleCaja, neto: entraCaja - saleCaja },
+      banco: { entra: entraBanco, sale: saleBanco, neto: entraBanco - saleBanco },
+    }
+  }, [raw, mesSeleccionado])
+
+  return {
+    mesActual,
+    mesAnterior,
+    historico,
+    desglosePagos,
+    desgloseGastos,
+    topClientes,
+    topProductos,
+    ventasPorCanal,
+    pedidosConPerdida,
+    cuentasPorCobrar,
+    inventario,
+    flujoFondos,
+    mesSeleccionado,
+    setMesSeleccionado,
+    mesesDisponibles,
+    loading,
+    error,
+  }
 }
