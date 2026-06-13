@@ -72,7 +72,7 @@ function ModalUsuario({ usuario, onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <h3 className="text-sm font-medium text-gray-900">
           {usuario ? 'Editar usuario' : 'Nuevo usuario'}
         </h3>
@@ -198,7 +198,7 @@ export default function UsuariosPage() {
           { rol: 'admin', desc: 'Acceso total al sistema: ventas, productos, insumos, gastos y finanzas.' },
           { rol: 'user',  desc: 'Solo ventas, presupuestos, devoluciones y clientes. Sin acceso a insumos, gastos ni finanzas.' },
         ].map(r => (
-          <div key={r.rol} className="bg-white border border-gray-200 rounded-xl p-3">
+          <div key={r.rol} className="bg-surface border border-gray-200 rounded-xl p-3">
             <div className="flex items-center gap-2 mb-1">
               <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${ROL_CFG[r.rol as keyof typeof ROL_CFG].cls}`}>
                 {ROL_CFG[r.rol as keyof typeof ROL_CFG].label}
@@ -210,7 +210,7 @@ export default function UsuariosPage() {
       </div>
 
       {/* Tabla */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">

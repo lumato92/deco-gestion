@@ -186,7 +186,7 @@ function FormProducto({ id }: { id: number | null }) {
     return (
       <div className="p-5 space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
+          <div key={i} className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="h-4 bg-gray-100 rounded animate-pulse w-1/3 mb-3" />
             <div className="h-10 bg-gray-100 rounded animate-pulse" />
           </div>
@@ -227,7 +227,7 @@ function FormProducto({ id }: { id: number | null }) {
         <div className="flex flex-col gap-4">
 
           {/* Datos básicos */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-4">Datos básicos</div>
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
@@ -277,7 +277,7 @@ function FormProducto({ id }: { id: number | null }) {
           </div>
 
           {/* Tipo */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Tipo de producto</div>
             <div className="flex gap-0 border border-gray-200 rounded-lg overflow-hidden mb-4 w-fit">
               {([
@@ -300,7 +300,7 @@ function FormProducto({ id }: { id: number | null }) {
                     value={busquedaInsumo} onChange={e => setBusquedaInsumo(e.target.value)}
                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                   {resultadosInsumo.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
                       {resultadosInsumo.map(ins => (
                         <button key={ins.id} onClick={() => agregarInsumo(ins)}
                           className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0">
@@ -332,7 +332,7 @@ function FormProducto({ id }: { id: number | null }) {
                           <td className="py-2">
                             <input type="number" min={0} step={0.01} value={r.cantidad}
                               onChange={e => actualizarCantidadReceta(r.insumo_id, Number(e.target.value))}
-                              className="w-full text-center text-[13px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                              className="w-full text-center text-[13px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                           </td>
                           <td className="py-2 text-gray-500">{r.unidad}</td>
                           <td className="py-2 text-right text-gray-900">{formatMonto(r.costo_item)}</td>
@@ -368,7 +368,7 @@ function FormProducto({ id }: { id: number | null }) {
         <div className="flex flex-col gap-4">
 
           {/* Precio y stock */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Precio y stock</div>
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
@@ -403,7 +403,7 @@ function FormProducto({ id }: { id: number | null }) {
           </div>
 
           {/* Visibilidad */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Visibilidad</div>
             <div className="flex flex-col gap-3">
               {[
@@ -419,7 +419,7 @@ function FormProducto({ id }: { id: number | null }) {
                     style={{ width: 32, height: 18, position: 'relative' }}
                     className={`rounded-full transition-colors flex-shrink-0 ${toggle.val ? 'bg-teal-500' : 'bg-gray-300'}`}>
                     <div style={{ width: 14, height: 14, top: 2, left: toggle.val ? 16 : 2, position: 'absolute' }}
-                      className="rounded-full bg-white transition-all" />
+                      className="rounded-full bg-surface transition-all" />
                   </button>
                 </div>
               ))}

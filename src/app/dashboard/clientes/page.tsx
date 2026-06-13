@@ -68,7 +68,7 @@ function ModalCliente({ cliente, onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <h3 className="text-sm font-medium text-gray-900">
           {cliente ? 'Editar cliente' : 'Nuevo cliente'}
         </h3>
@@ -171,7 +171,7 @@ function DetalleCliente({ cliente, onCerrar, onEditar, onNuevaVenta }: {
                 ))}
               </div>
               {cliente.notas && (
-                <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-[11px] text-gray-600">
+                <div className="bg-surface border border-gray-200 rounded-lg px-3 py-2 text-[11px] text-gray-600">
                   {cliente.notas}
                 </div>
               )}
@@ -254,11 +254,11 @@ function DetalleCliente({ cliente, onCerrar, onEditar, onNuevaVenta }: {
                 + Nueva venta
               </Link>
               <Link href={`/dashboard/ventas/presupuestos/nuevo?cliente_id=${cliente.id}`}
-                className="w-full py-2 text-xs font-medium text-center border border-gray-200 rounded-lg text-gray-600 hover:bg-white">
+                className="w-full py-2 text-xs font-medium text-center border border-gray-200 rounded-lg text-gray-600 hover:bg-surface">
                 + Nuevo presupuesto
               </Link>
               <button onClick={onEditar}
-                className="w-full py-2 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-white">
+                className="w-full py-2 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-surface">
                 Editar datos
               </button>
               <button onClick={onCerrar}
@@ -343,7 +343,7 @@ export default function ClientesPage() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+      <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
         <input type="text" placeholder="Buscar por nombre, teléfono o email..."
           value={filtros.busqueda} onChange={e => setFiltros({ busqueda: e.target.value })}
           className="flex-1 min-w-[200px] text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
@@ -370,7 +370,7 @@ export default function ClientesPage() {
       )}
 
       {/* Tabla */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <span className="text-xs text-gray-400">
             {loading ? 'Cargando...' : `${clientes.length} clientes · clic en una fila para ver historial`}

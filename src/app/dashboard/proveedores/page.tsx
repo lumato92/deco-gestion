@@ -141,7 +141,7 @@ function ModalProveedor({ proveedor, onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="bg-surface rounded-xl border border-gray-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
 
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-sm font-medium text-gray-900">
@@ -317,7 +317,7 @@ function DetalleProveedor({ p, onCerrar }: { p: Proveedor; onCerrar: () => void 
           <div>
             <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-2">Notas</div>
             {p.notas ? (
-              <p className="text-[12px] text-gray-700 bg-white border border-gray-200 rounded-lg px-3 py-2 leading-relaxed">
+              <p className="text-[12px] text-gray-700 bg-surface border border-gray-200 rounded-lg px-3 py-2 leading-relaxed">
                 {p.notas}
               </p>
             ) : (
@@ -428,7 +428,7 @@ export default function ProveedoresPage() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+      <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
         <input type="text" placeholder="Buscar por nombre, rubro o contacto..."
           value={busqueda} onChange={e => setBusqueda(e.target.value)}
           className="flex-1 min-w-[180px] text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
@@ -451,7 +451,7 @@ export default function ProveedoresPage() {
       </div>
 
       {/* Tabla */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 text-xs text-gray-400">
           {loading ? 'Cargando...' : `${proveedores.length} proveedores · clic en una fila para ver detalle`}
         </div>

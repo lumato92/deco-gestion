@@ -50,7 +50,7 @@ function InputCategoria({ value, onChange, categorias }: {
         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
       />
       {abierto && sugerencias.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-20 overflow-hidden shadow-sm">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-20 overflow-hidden shadow-sm">
           {sugerencias.map(c => (
             <button key={c} onMouseDown={() => { onChange(c); setAbierto(false) }}
               className="w-full text-left px-3 py-2 text-[12px] text-gray-900 hover:bg-gray-50 border-b border-gray-100 last:border-0">
@@ -118,7 +118,7 @@ function SelectorProveedor({ value, onChange, onNuevo }: {
           className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
         />
         {abierto && resultados.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-20 overflow-hidden shadow-sm">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-20 overflow-hidden shadow-sm">
             {resultados.map(p => (
               <button key={p.id}
                 onMouseDown={() => {
@@ -179,7 +179,7 @@ function ModalNuevoProveedor({ onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-gray-900">Nuevo proveedor</h3>
           <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
@@ -283,7 +283,7 @@ function ModalInsumo({ insumo, categorias, onGuardar, onCerrar }: {
       )}
 
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-md flex flex-col gap-4">
+        <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-md flex flex-col gap-4">
           <h3 className="text-sm font-medium text-gray-900">
             {insumo ? 'Editar insumo' : 'Nuevo insumo'}
           </h3>
@@ -412,7 +412,7 @@ function PanelAjuste({ insumo, onAjustar, onCerrar }: {
                   { val: 'ajuste',  label: 'Ajuste manual' },
                 ] as const).map(op => (
                   <button key={op.val} onClick={() => setOperacion(op.val)}
-                    className={`px-3 py-1.5 text-xs font-medium border-r border-gray-200 last:border-0 transition-colors ${operacion === op.val ? 'bg-white text-gray-900' : 'text-gray-500 hover:bg-gray-100'}`}>
+                    className={`px-3 py-1.5 text-xs font-medium border-r border-gray-200 last:border-0 transition-colors ${operacion === op.val ? 'bg-surface text-gray-900' : 'text-gray-500 hover:bg-gray-100'}`}>
                     {op.label}
                   </button>
                 ))}
@@ -426,7 +426,7 @@ function PanelAjuste({ insumo, onAjustar, onCerrar }: {
               <div className="flex items-center gap-2">
                 <input type="number" min={0} step={0.01} value={cantidad}
                   onChange={e => setCantidad(Number(e.target.value))}
-                  className="w-24 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400" />
+                  className="w-24 text-sm text-gray-900 bg-surface border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400" />
                 <span className="text-[11px] text-gray-500">{insumo.unidad}</span>
               </div>
             </div>
@@ -438,7 +438,7 @@ function PanelAjuste({ insumo, onAjustar, onCerrar }: {
                 </label>
                 <input type="number" min={0} value={nuevoCosto}
                   onChange={e => setNuevoCosto(Number(e.target.value))}
-                  className="w-32 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400" />
+                  className="w-32 text-sm text-gray-900 bg-surface border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400" />
               </div>
             )}
 
@@ -558,7 +558,7 @@ export default function InsumosPage() {
                 ? (tab.key === 'bajo' || tab.key === 'sinstock')
                   ? 'bg-red-50 border-red-400 text-red-700'
                   : 'bg-teal-50 border-teal-500 text-teal-800'
-                : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                : 'bg-surface border-gray-200 text-gray-500 hover:border-gray-300'
             }`}>
             {tab.label}
           </button>
@@ -566,7 +566,7 @@ export default function InsumosPage() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+      <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
         <input type="text" placeholder="Buscar por nombre, categoría o proveedor..."
           value={filtros.busqueda} onChange={e => setFiltros({ busqueda: e.target.value })}
           className="flex-1 min-w-[180px] text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
@@ -594,7 +594,7 @@ export default function InsumosPage() {
       )}
 
       {/* Tabla */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <span className="text-xs text-gray-400">
             {loading ? 'Cargando...' : `${insumosFiltrados.length} insumos`}

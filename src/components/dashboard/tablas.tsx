@@ -33,7 +33,7 @@ interface VentasRecientesProps {
 
 export function VentasRecientes({ ventas, loading }: VentasRecientesProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <span className="text-[13px] font-medium text-gray-900">Ventas recientes</span>
         <Link href="/dashboard/ventas" className="text-[11px] text-teal-600 hover:underline">
@@ -100,7 +100,7 @@ export function TopProductos({ productos, loading }: TopProductosProps) {
   const maxUnidades = Math.max(...productos.map(p => p.unidades_vendidas), 1)
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <span className="text-[13px] font-medium text-gray-900">Más vendidos del mes</span>
         <Link href="/dashboard/productos" className="text-[11px] text-teal-600 hover:underline">
@@ -152,7 +152,7 @@ interface AlertasStockProps {
 
 export function AlertasStock({ alertas, loading }: AlertasStockProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <span className="text-[13px] font-medium text-gray-900">Alertas de stock</span>
         <Link href="/dashboard/insumos" className="text-[11px] text-teal-600 hover:underline">
@@ -228,7 +228,7 @@ const PLAZO_CONFIG = {
 
 export function FabricacionPendiente({ items, loading }: FabricacionProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <span className="text-[13px] font-medium text-gray-900">Encargos en fabricación</span>
         <Link href="/dashboard/ventas" className="text-[11px] text-teal-600 hover:underline">

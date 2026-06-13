@@ -67,7 +67,7 @@ function ModalRecibir({ compra, onCompletado, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="bg-surface rounded-xl border border-gray-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
           <h3 className="text-sm font-medium text-gray-900">Registrar recepción · {compra.numero_oc}</h3>
           <p className="text-xs text-gray-400 mt-0.5">{compra.proveedor_nombre}</p>
@@ -96,7 +96,7 @@ function ModalRecibir({ compra, onCompletado, onCerrar }: {
                         const val = Math.min(Number(e.target.value), l.cantidad_pedida - l.cantidad_recibida)
                         setLineas(prev => prev.map((x, j) => j === i ? { ...x, cant_recibir: val } : x))
                       }}
-                      className="w-full text-right text-[13px] text-gray-900 bg-white border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400" />
+                      className="w-full text-right text-[13px] text-gray-900 bg-surface border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400" />
                   </div>
                 ))}
               </div>
@@ -168,7 +168,7 @@ function ModalPagar({ compra, onCompletado, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <div>
           <h3 className="text-sm font-medium text-gray-900">Registrar pago · {compra.numero_oc}</h3>
           <p className="text-xs text-gray-400 mt-0.5">{compra.proveedor_nombre}</p>
@@ -266,7 +266,7 @@ export default function PedidosPage() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+      <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
         <input type="text" placeholder="Buscar proveedor, OC..."
           value={filtros.busqueda} onChange={e => setFiltros({ busqueda: e.target.value })}
           className="flex-1 min-w-[180px] text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
@@ -283,11 +283,11 @@ export default function PedidosPage() {
           <option value="recibida_parcial">Parcial</option>
           <option value="cancelada">Cancelada</option>
         </select>
-        <button onClick={limpiarFiltros} className="ml-auto text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 border border-gray-200 rounded-lg bg-white">Limpiar</button>
+        <button onClick={limpiarFiltros} className="ml-auto text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 border border-gray-200 rounded-lg bg-surface">Limpiar</button>
       </div>
 
       {/* Tabla */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
           <span className="text-xs text-gray-400">{loading ? 'Cargando...' : `${compras.length} pedidos`}</span>
         </div>
