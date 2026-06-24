@@ -60,7 +60,7 @@ function ModalNuevoCliente({ onGuardar, onCancelar }: ModalNuevoClienteProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <h3 className="text-sm font-medium text-gray-900">Nuevo cliente</h3>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
@@ -120,6 +120,7 @@ export default function EditarPresupuestoPage() {
   const [loading, setLoading] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [noEditable, setNoEditable] = useState<string | null>(null)
 
   // Datos del presupuesto
   const [clienteId, setClienteId] = useState<number | null>(null)
@@ -159,6 +160,19 @@ export default function EditarPresupuestoPage() {
 
       if (pedidoRes.data) {
         const p = pedidoRes.data
+
+        // Solo se pueden editar presupuestos sin confirmar.
+        // Una vez confirmado, el pedido ya descontó stock / generó pagos.
+        if (p.estado !== 'presupuesto') {
+          setNoEditable(
+            p.estado === 'cancelado'
+              ? 'Este presupuesto fue cancelado y no puede editarse.'
+              : 'Este presupuesto ya fue confirmado y no puede editarse.'
+          )
+          setLoading(false)
+          return
+        }
+
         setClienteId(p.cliente_id ?? null)
         setCanalVenta(p.canal_venta ?? 'whatsapp')
         setFechaEntrega(p.fecha_entrega ? p.fecha_entrega.split('T')[0] : '')
@@ -332,11 +346,29 @@ export default function EditarPresupuestoPage() {
     return (
       <div className="p-5 space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
+          <div key={i} className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="h-4 bg-gray-100 rounded animate-pulse w-1/3 mb-3" />
             <div className="h-10 bg-gray-100 rounded animate-pulse" />
           </div>
         ))}
+      </div>
+    )
+  }
+
+  if (noEditable) {
+    return (
+      <div className="p-5 flex flex-col gap-4">
+        <div>
+          <p className="text-xs text-gray-400 mb-1">Ventas › Presupuestos › Editar #{id}</p>
+          <h1 className="text-base font-medium text-gray-900">Editar presupuesto</h1>
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-6 flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-amber-800">{noEditable}</p>
+          <button onClick={() => router.push('/dashboard/ventas/presupuestos')}
+            className="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+            Volver a presupuestos
+          </button>
+        </div>
       </div>
     )
   }
@@ -379,7 +411,7 @@ export default function EditarPresupuestoPage() {
         <div className="flex flex-col gap-4">
 
           {/* Cliente */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Cliente</div>
             {clienteSeleccionado ? (
               <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
@@ -400,7 +432,7 @@ export default function EditarPresupuestoPage() {
                     value={busquedaCli} onChange={e => setBusquedaCli(e.target.value)}
                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                   {resultadosCli.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
                       {resultadosCli.map(c => (
                         <button key={c.id} onClick={() => seleccionarCliente(c)}
                           className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0">
@@ -425,7 +457,7 @@ export default function EditarPresupuestoPage() {
           </div>
 
           {/* Productos */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Productos</div>
 
             {/* Buscador */}
@@ -434,7 +466,7 @@ export default function EditarPresupuestoPage() {
                 value={busquedaProd} onChange={e => setBusquedaProd(e.target.value)}
                 className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
               {resultadosProd.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-sm z-10 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg shadow-sm z-10 overflow-hidden">
                   {resultadosProd.map(p => (
                     <button key={p.id} onClick={() => agregarProducto(p)}
                       className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0">
@@ -493,12 +525,12 @@ export default function EditarPresupuestoPage() {
                           <td className="py-2">
                             <input type="number" min={1} value={item.cantidad}
                               onChange={e => actualizarItem(idx, { cantidad: Number(e.target.value) })}
-                              className="w-full text-center text-[13px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                              className="w-full text-center text-[13px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                           </td>
                           <td className="py-2">
                             <input type="number" min={0} value={item.precio_unitario}
                               onChange={e => actualizarItem(idx, { precio_unitario: Number(e.target.value) })}
-                              className="w-full text-right text-[13px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                              className="w-full text-right text-[13px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                           </td>
                           <td className="py-2 text-right font-medium text-gray-900">
                             {formatMonto(item.cantidad * item.precio_unitario)}
@@ -526,7 +558,7 @@ export default function EditarPresupuestoPage() {
                     <input type="number" min={0} value={descuentoValor || ''}
                       onChange={e => setDescuentoValor(Number(e.target.value))}
                       placeholder="0"
-                      className="w-20 text-right text-[13px] text-gray-900 bg-white border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400" />
+                      className="w-20 text-right text-[13px] text-gray-900 bg-surface border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400" />
                   </div>
                 </div>
               </>
@@ -534,7 +566,7 @@ export default function EditarPresupuestoPage() {
           </div>
 
           {/* Detalles */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Detalles</div>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="flex flex-col gap-1.5">
@@ -566,7 +598,7 @@ export default function EditarPresupuestoPage() {
         <div className="flex flex-col gap-4">
 
           {/* Tipo entrega */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Tipo de entrega</div>
             <div className="flex flex-col gap-2">
               {([
@@ -598,7 +630,7 @@ export default function EditarPresupuestoPage() {
           </div>
 
           {/* Totales */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-[12px]">
                 <span className="text-gray-600">Subtotal</span>

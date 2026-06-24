@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# documentos de negocio (validación ecommerce — no es código)
+/docs/validacion-ecommerce/

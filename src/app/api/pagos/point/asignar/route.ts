@@ -27,12 +27,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Pago no encontrado o ya asignado' }, { status: 404 })
     }
 
-    // Registramos en pagos_pedido
+    // Registramos en pagos_pedido.
+    // monto = bruto (lo que pagó el cliente, usado para saldar el pedido).
+    // comisiones = lo que retuvo MP; las vistas lo restan del ingreso neto.
     const { error: errPago } = await supabase.from('pagos_pedido').insert({
       pedido_id,
       tipo: 'saldo',
       metodo_pago: 'debito', // se pisa con el medio real si está disponible
       monto: pagoPoint.monto,
+      comisiones: pagoPoint.comisiones ?? 0,
       notas: `Point MP #${mp_pago_id} · Neto $${pagoPoint.monto_neto} · Comisiones $${pagoPoint.comisiones}`,
     })
 

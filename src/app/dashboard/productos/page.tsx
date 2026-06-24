@@ -76,7 +76,7 @@ function PanelAjuste({ producto, onAjustar, onCerrar }: {
                 ] as const).map(op => (
                   <button key={op.val} onClick={() => setOperacion(op.val)}
                     className={`px-3 py-1.5 text-xs font-medium border-r border-gray-200 last:border-0 transition-colors ${
-                      operacion === op.val ? 'bg-white text-gray-900' : 'text-gray-500 hover:bg-gray-100'
+                      operacion === op.val ? 'bg-surface text-gray-900' : 'text-gray-500 hover:bg-gray-100'
                     }`}>
                     {op.label}
                   </button>
@@ -92,7 +92,7 @@ function PanelAjuste({ producto, onAjustar, onCerrar }: {
                 <input
                   type="number" min={0} step={1} value={cantidad}
                   onChange={e => setCantidad(Number(e.target.value))}
-                  className="w-24 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400"
+                  className="w-24 text-sm text-gray-900 bg-surface border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400"
                 />
                 <span className="text-[11px] text-gray-500">u.</span>
               </div>
@@ -106,7 +106,7 @@ function PanelAjuste({ producto, onAjustar, onCerrar }: {
                 <input
                   type="number" min={0} value={nuevoCosto}
                   onChange={e => setNuevoCosto(Number(e.target.value))}
-                  className="w-32 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400"
+                  className="w-32 text-sm text-gray-900 bg-surface border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400"
                 />
               </div>
             )}
@@ -196,7 +196,7 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="bg-surface rounded-xl border border-gray-200 w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
           <h3 className="text-sm font-medium text-gray-900">Fabricar producto</h3>
           <p className="text-xs text-gray-400 mt-0.5">
@@ -212,7 +212,7 @@ function ModalFabricar({ producto, onCompletado, onCerrar }: {
                 className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-lg font-medium">−</button>
               <input type="number" min={1} value={cantidad}
                 onChange={e => setCantidad(Math.max(1, Number(e.target.value)))}
-                className="w-20 text-center text-[16px] font-medium text-gray-900 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400" />
+                className="w-20 text-center text-[16px] font-medium text-gray-900 bg-surface border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-teal-400" />
               <button onClick={() => setCantidad(q => q + 1)}
                 className="w-8 h-8 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-lg font-medium">+</button>
               <span className="text-[12px] text-gray-400">unidades</span>
@@ -391,7 +391,7 @@ export default function ProductosPage() {
       <div className="flex gap-2 flex-wrap">
         <button onClick={() => setFiltros({ categoria_id: '' })}
           className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-            filtros.categoria_id === '' ? 'bg-teal-50 border-teal-500 text-teal-800' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+            filtros.categoria_id === '' ? 'bg-teal-50 border-teal-500 text-teal-800' : 'bg-surface border-gray-200 text-gray-500 hover:border-gray-300'
           }`}>
           Todos ({todos.length})
         </button>
@@ -400,7 +400,7 @@ export default function ProductosPage() {
           return (
             <button key={c.id} onClick={() => setFiltros({ categoria_id: c.id })}
               className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                filtros.categoria_id === c.id ? 'bg-teal-50 border-teal-500 text-teal-800' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                filtros.categoria_id === c.id ? 'bg-teal-50 border-teal-500 text-teal-800' : 'bg-surface border-gray-200 text-gray-500 hover:border-gray-300'
               }`}>
               {c.nombre} ({cnt})
             </button>
@@ -409,7 +409,7 @@ export default function ProductosPage() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+      <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
         <input type="text" placeholder="Buscar por nombre..."
           value={filtros.busqueda} onChange={e => setFiltros({ busqueda: e.target.value })}
           className="flex-1 min-w-[160px] text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
@@ -426,14 +426,14 @@ export default function ProductosPage() {
           </select>
         ))}
         <button onClick={limpiarFiltros}
-          className="ml-auto text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 border border-gray-200 rounded-lg bg-white">
+          className="ml-auto text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 border border-gray-200 rounded-lg bg-surface">
           Limpiar
         </button>
       </div>
 
       {/* VISTA LISTA */}
       {vista === 'lista' && (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="text-xs text-gray-400">
               {loading ? 'Cargando...' : `${productos.length} productos`}
@@ -553,7 +553,7 @@ export default function ProductosPage() {
         <div className="grid grid-cols-3 gap-3">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div key={i} className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
                   <div className="h-28 bg-gray-100 animate-pulse" />
                   <div className="p-3 space-y-2">
                     <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4" />
@@ -564,7 +564,7 @@ export default function ProductosPage() {
             : productos.map(p => {
                 const stock = p.estado_stock ? STOCK_CFG[p.estado_stock] : null
                 return (
-                  <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition-colors">
+                  <div key={p.id} className="bg-surface border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition-colors">
                     <div className="h-28 bg-gray-100 flex items-center justify-center border-b border-gray-100 overflow-hidden">
                       {p.imagen_principal
                         ? <img src={p.imagen_principal} alt={p.nombre} className="w-full h-full object-cover" />

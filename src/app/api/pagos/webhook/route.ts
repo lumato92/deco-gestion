@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
       tipo: 'saldo',
       metodo_pago: 'mercadopago',
       monto: montobruto,
+      comisiones,
       notas: `Pago MP #${pago.id} · Neto $${neto} · Comisiones $${comisiones}`,
     })
 

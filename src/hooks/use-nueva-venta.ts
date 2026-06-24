@@ -123,7 +123,6 @@ export function useNuevaVenta() {
 
     const fechaBase = form.fecha || fechaHoy()
     const fechaConfirmacion = new Date(`${fechaBase}T${new Date().toTimeString().split(' ')[0]}`).toISOString()
-    const estadoInicial = form.entrega_inmediata ? 'entregado' : 'confirmado'
 
     try {
       const { data: pedido, error: errPedido } = await supabase
@@ -131,7 +130,7 @@ export function useNuevaVenta() {
         .insert({
           cliente_id: form.cliente_id,
           origen_venta: 'directa',
-          estado: estadoInicial,
+          estado: 'confirmado',
           canal_venta: form.canal_venta,
           metodo_pago: form.metodo_pago,
           descuento_pct: Math.round(descuentoPct * 100) / 100,
@@ -176,11 +175,22 @@ export function useNuevaVenta() {
         if (errPago) throw new Error(errPago.message)
       }
 
-      const { data: resultado } = await supabase
+      const { data: resultado, error: errRpc } = await supabase
         .rpc('descontar_stock_pedido', { p_pedido_id: pedido.id })
+
+      if (errRpc) throw new Error(errRpc.message)
 
       if (resultado && !resultado.ok) {
         setError(`Stock insuficiente: ${JSON.stringify(resultado.errores)}`)
+        return pedido.id
+      }
+
+      if (form.entrega_inmediata) {
+        const { error: errEntrega } = await supabase
+          .from('pedidos')
+          .update({ estado: 'entregado' })
+          .eq('id', pedido.id)
+        if (errEntrega) throw new Error(errEntrega.message)
       }
 
       return pedido.id

@@ -35,7 +35,7 @@ export function ModalNuevoProveedor({ onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-gray-900">Nuevo proveedor</h3>
           <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded">Podés completar más datos desde Proveedores</span>
@@ -131,7 +131,7 @@ export function ModalNuevoItem({ tipo, onGuardar, onCerrar }: {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium text-gray-900">
             Nuevo {tipo === 'insumo' ? 'insumo' : 'producto'}
@@ -256,7 +256,7 @@ export function SelectorProveedor({ value, onChange, obligatorio = false }: {
             placeholder="Buscar proveedor..."
             className={`w-full text-sm bg-gray-50 border rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 ${obligatorio ? 'border-amber-300' : 'border-gray-200'}`} />
           {abierto && resultados.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-20 shadow-sm overflow-hidden max-h-48 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-20 shadow-sm overflow-hidden max-h-48 overflow-y-auto">
               {resultados.map(p => (
                 <button key={p.id}
                   onMouseDown={() => { onChange(p); setBusqueda(''); setAbierto(false) }}
@@ -323,7 +323,7 @@ export function BuscadorArticulo({ tipoDestino, onSeleccionar }: {
             value={busqueda} onChange={e => setBusqueda(e.target.value)}
             className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
           {resultados.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-10 shadow-sm overflow-hidden">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-10 shadow-sm overflow-hidden">
               {resultados.map(r => (
                 <button key={r.id}
                   onClick={() => { onSeleccionar(r); setBusqueda('') }}

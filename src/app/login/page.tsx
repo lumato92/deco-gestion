@@ -51,7 +51,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div className="bg-surface border border-gray-200 rounded-xl p-6 shadow-sm">
       <form onSubmit={handleLogin} className="flex flex-col gap-4">
 
         <div className="flex flex-col gap-1.5">
@@ -65,7 +65,7 @@ function LoginForm() {
             placeholder="tu_usuario"
             autoFocus
             autoComplete="username"
-            className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:bg-white transition-colors"
+            className="text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:bg-surface transition-colors"
           />
         </div>
 
@@ -80,7 +80,7 @@ function LoginForm() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 pr-10 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:bg-white transition-colors"
+              className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 pr-10 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:bg-surface transition-colors"
             />
             <button
               type="button"
@@ -127,7 +127,7 @@ export default function LoginPage() {
 
         {/* Suspense obligatorio por useSearchParams */}
         <Suspense fallback={
-          <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm h-48 animate-pulse" />
+          <div className="bg-surface border border-gray-200 rounded-xl p-6 shadow-sm h-48 animate-pulse" />
         }>
           <LoginForm />
         </Suspense>

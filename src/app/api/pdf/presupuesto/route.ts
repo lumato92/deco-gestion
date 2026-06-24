@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
             React.createElement(Text, { style: { fontSize: 10, color: COLORS.gray } }, formatMonto(subtotal)),
           ),
           descuento > 0 && React.createElement(View, { style: s.totalRow },
-            React.createElement(Text, { style: { fontSize: 10, color: COLORS.gray } }, `Descuento (${descuento}%)`),
+            React.createElement(Text, { style: { fontSize: 10, color: COLORS.gray } }, 'Descuento'),
             React.createElement(Text, { style: { fontSize: 10, color: COLORS.gray } }, `— ${formatMonto(subtotal * descuento / 100)}`),
           ),
           React.createElement(View, { style: s.totalFinal },
