@@ -67,11 +67,11 @@ export default function DashboardPage() {
         </div>
         <div className="flex gap-2 items-center">
           <button onClick={recargar}
-            className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white text-gray-400 hover:text-gray-600 hover:bg-gray-50">
+            className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-surface text-gray-400 hover:text-gray-600 hover:bg-gray-50">
             ↻
           </button>
           <Link href="/dashboard/ventas/presupuestos/nuevo"
-            className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-600 hover:bg-gray-50">
+            className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-surface text-gray-600 hover:bg-gray-50">
             + Presupuesto
           </Link>
           <Link href="/dashboard/ventas/nueva"
@@ -134,7 +134,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-3 gap-3">
 
         {/* Balance MP */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-medium text-gray-900">Balance Mercado Pago</span>
             <span className="text-[11px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">En tiempo real</span>
@@ -164,7 +164,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Pagos Point pendientes */}
-        <div className={`rounded-xl border p-4 flex flex-col gap-3 ${pagosPointPendientes.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}>
+        <div className={`rounded-xl border p-4 flex flex-col gap-3 ${pagosPointPendientes.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-surface border-gray-200'}`}>
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-medium text-gray-900">Pagos Point sin asignar</span>
             <Link href="/dashboard/ventas" className="text-[11px] text-teal-600 hover:underline">
@@ -199,7 +199,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Presupuestos sin confirmar */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-[13px] font-medium text-gray-900">Presupuestos abiertos</span>
             <Link href="/dashboard/ventas/presupuestos" className="text-[11px] text-teal-600 hover:underline">
@@ -228,7 +228,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-4">
 
         {/* Últimas 5 ventas */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="text-[13px] font-medium text-gray-900">Últimas ventas</span>
             <Link href="/dashboard/ventas" className="text-[11px] text-teal-600 hover:underline">Ver todas →</Link>
@@ -278,7 +278,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Top 5 productos */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="text-[13px] font-medium text-gray-900">Más vendidos del mes</span>
             <Link href="/dashboard/productos" className="text-[11px] text-teal-600 hover:underline">Ver catálogo →</Link>
@@ -310,7 +310,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-3 gap-4">
 
         {/* Alertas de stock */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="text-[13px] font-medium text-gray-900">Alertas de stock</span>
             <Link href="/dashboard/insumos" className="text-[11px] text-teal-600 hover:underline">Ver insumos →</Link>
@@ -339,7 +339,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Fabricación pendiente */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <span className="text-[13px] font-medium text-gray-900">Encargos en fabricación</span>
             <Link href="/dashboard/ventas" className="text-[11px] text-teal-600 hover:underline">Ver ventas →</Link>

@@ -50,7 +50,7 @@ export default function PresupuestosPage() {
       {/* Modal */}
       {pedidoConfirmando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-md">
+          <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-md">
             <h3 className="text-sm font-medium text-gray-900 mb-1">
               Confirmar presupuesto #{pedidoConfirmando.id}
             </h3>
@@ -126,7 +126,7 @@ export default function PresupuestosPage() {
       )}
 
       {/* Tabla */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <span className="text-xs text-gray-400">
             {loading ? 'Cargando...' : `${presupuestos.length} presupuestos activos`}

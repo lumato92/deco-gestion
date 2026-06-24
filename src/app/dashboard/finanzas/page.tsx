@@ -42,7 +42,7 @@ const CANAL_CFG: Record<string, { label: string; color: string }> = {
 function TooltipCustom({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-[12px]">
+    <div className="bg-surface border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-[12px]">
       <div className="font-medium text-gray-900 mb-1">{label}</div>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center gap-2">
@@ -143,7 +143,7 @@ export default function FinanzasPage() {
         </div>
         <div className="flex items-center gap-2">
           {/* Selector de mes */}
-          <div className="flex items-center border border-gray-200 rounded-lg bg-white overflow-hidden">
+          <div className="flex items-center border border-gray-200 rounded-lg bg-surface overflow-hidden">
             <button
               onClick={() => hayAnterior && setMesSeleccionado(mesesDisponibles[idxMes + 1].value)}
               disabled={!hayAnterior}
@@ -155,7 +155,7 @@ export default function FinanzasPage() {
             <select
               value={mesSeleccionado}
               onChange={e => setMesSeleccionado(e.target.value)}
-              className="text-xs font-medium text-gray-700 px-2 py-1.5 border-x border-gray-200 focus:outline-none capitalize bg-white min-w-[120px] text-center"
+              className="text-xs font-medium text-gray-700 px-2 py-1.5 border-x border-gray-200 focus:outline-none capitalize bg-surface min-w-[120px] text-center"
             >
               {mesesDisponibles.map(m => (
                 <option key={m.value} value={m.value}>{m.label}</option>
@@ -173,7 +173,7 @@ export default function FinanzasPage() {
           <a
             href={`/api/pdf/financiero?mes=${parseInt(mesNumSel)}&anio=${anioSel}`}
             target="_blank"
-            className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-600 hover:bg-gray-50"
+            className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-surface text-gray-600 hover:bg-gray-50"
           >
             Exportar PDF
           </a>
@@ -214,7 +214,7 @@ export default function FinanzasPage() {
       </div>
 
       {/* Gráfico histórico — área */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="bg-surface border border-gray-200 rounded-xl p-4">
         <div className="text-[13px] font-medium text-gray-900 mb-4">Evolución últimos 6 meses</div>
         {loading ? (
           <div className="h-48 bg-gray-50 rounded-lg animate-pulse" />
@@ -250,7 +250,7 @@ export default function FinanzasPage() {
       <div className="grid grid-cols-2 gap-4">
 
         {/* Gráfico de barras ingresos vs gastos */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="text-[13px] font-medium text-gray-900 mb-4">Ingresos vs Gastos</div>
           {loading ? (
             <div className="h-40 bg-gray-50 rounded-lg animate-pulse" />
@@ -270,7 +270,7 @@ export default function FinanzasPage() {
         </div>
 
         {/* Desglose métodos de pago */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="text-[13px] font-medium text-gray-900 mb-4">Ingresos por método de pago</div>
           {loading ? (
             <div className="space-y-3">
@@ -312,7 +312,7 @@ export default function FinanzasPage() {
       <div className="grid grid-cols-3 gap-4">
 
         {/* Resultado neto */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="text-[13px] font-medium text-gray-900 mb-4">Resultado neto</div>
           {loading ? (
             <div className="h-36 bg-gray-50 rounded-lg animate-pulse" />
@@ -338,7 +338,7 @@ export default function FinanzasPage() {
         </div>
 
         {/* Gastos por categoría */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="text-[13px] font-medium text-gray-900 mb-4">Gastos del mes por categoría</div>
           {loading ? (
             <div className="space-y-2">
@@ -370,7 +370,7 @@ export default function FinanzasPage() {
         </div>
 
         {/* Top clientes */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="text-[13px] font-medium text-gray-900 mb-4">Top clientes del mes</div>
           {loading ? (
             <div className="space-y-3">
@@ -405,7 +405,7 @@ export default function FinanzasPage() {
       <div className="grid grid-cols-3 gap-4">
 
         {/* Cuentas por cobrar */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-[13px] font-medium text-gray-900">Cuentas por cobrar</div>
             <span className="text-[10px] text-gray-400">al día de hoy</span>
@@ -437,7 +437,7 @@ export default function FinanzasPage() {
         </div>
 
         {/* Caja vs Banco */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="text-[13px] font-medium text-gray-900 mb-3">Flujo de fondos del mes</div>
           {loading ? (
             <div className="h-28 bg-gray-50 rounded-lg animate-pulse" />
@@ -471,7 +471,7 @@ export default function FinanzasPage() {
         </div>
 
         {/* Valor de inventario */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-[13px] font-medium text-gray-900">Valor de inventario</div>
             <span className="text-[10px] text-gray-400">al día de hoy</span>
@@ -524,7 +524,7 @@ export default function FinanzasPage() {
       <div className="grid grid-cols-3 gap-4">
 
         {/* Top productos */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 col-span-2">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4 col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div className="text-[13px] font-medium text-gray-900">Top productos del mes</div>
             <div className="flex border border-gray-200 rounded-lg overflow-hidden">
@@ -580,7 +580,7 @@ export default function FinanzasPage() {
         </div>
 
         {/* Ventas por canal */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4">
           <div className="text-[13px] font-medium text-gray-900 mb-4">Ventas por canal</div>
           {loading ? (
             <div className="space-y-3">
@@ -619,7 +619,7 @@ export default function FinanzasPage() {
       </div>
 
       {/* Tabla resumen histórico */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100">
           <span className="text-[13px] font-medium text-gray-900">Resumen por mes</span>
         </div>

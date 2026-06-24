@@ -57,7 +57,7 @@ function PopupExito({ total, pedidoId, entregaInmediata, linkMP, pagoPointAsigna
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-8 w-full max-w-sm text-center flex flex-col items-center gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-8 w-full max-w-sm text-center flex flex-col items-center gap-4">
         <div className="w-14 h-14 rounded-full bg-teal-100 flex items-center justify-center">
           <svg className="w-7 h-7 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -154,7 +154,7 @@ function ModalNuevoCliente({ onGuardar, onCancelar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
+      <div className="bg-surface rounded-xl border border-gray-200 p-6 w-full max-w-sm flex flex-col gap-4">
         <h3 className="text-sm font-medium text-gray-900">Nuevo cliente</h3>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
@@ -238,19 +238,19 @@ function FormProductoLibre({ onAgregar, onCancelar }: {
       </div>
       <input type="text" placeholder="Nombre del producto o servicio..."
         value={nombre} onChange={e => { setNombre(e.target.value); setError('') }} autoFocus
-        className="text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400" />
+        className="text-sm bg-surface border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400" />
       <div className="flex gap-2">
         <input type="number" placeholder="Precio unitario" min={0} value={precio}
           onChange={e => { setPrecio(e.target.value === '' ? '' : Number(e.target.value)); setError('') }}
-          className="flex-1 text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400" />
+          className="flex-1 text-sm bg-surface border border-purple-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-400" />
         <input type="number" placeholder="Cant." min={1} value={cantidad}
           onChange={e => setCantidad(Math.max(1, Number(e.target.value)))}
-          className="w-20 text-sm bg-white border border-purple-200 rounded-lg px-3 py-2 text-gray-900 text-center focus:outline-none focus:border-purple-400" />
+          className="w-20 text-sm bg-surface border border-purple-200 rounded-lg px-3 py-2 text-gray-900 text-center focus:outline-none focus:border-purple-400" />
       </div>
       {error && <p className="text-[11px] text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button onClick={onCancelar}
-          className="flex-1 py-1.5 text-[12px] border border-gray-200 rounded-lg text-gray-500 hover:bg-white">
+          className="flex-1 py-1.5 text-[12px] border border-gray-200 rounded-lg text-gray-500 hover:bg-surface">
           Cancelar
         </button>
         <button onClick={handleAgregar}
@@ -448,7 +448,7 @@ function NuevaVentaContent() {
           <h1 className="text-base font-medium text-gray-900">Nueva venta</h1>
         </div>
         <button onClick={() => router.back()}
-          className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-white text-gray-500 hover:bg-gray-50">
+          className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg bg-surface text-gray-500 hover:bg-gray-50">
           Cancelar
         </button>
       </div>
@@ -472,7 +472,7 @@ function NuevaVentaContent() {
       )}
 
       {/* Fecha + Canal — fila compacta */}
-      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4">
+      <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4">
         <div className="flex items-center gap-2 flex-1">
           <label className="text-[11px] text-gray-500 uppercase tracking-wide whitespace-nowrap">Fecha de la venta</label>
           <input
@@ -501,7 +501,7 @@ function NuevaVentaContent() {
         <div className="flex flex-col gap-4">
 
           {/* Productos */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="text-[13px] font-medium text-gray-900">Productos</div>
               {!mostrarFormLibre && (
@@ -517,7 +517,7 @@ function NuevaVentaContent() {
                 value={busquedaProd} onChange={e => setBusquedaProd(e.target.value)}
                 className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
               {resultadosProd.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-sm z-10 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg shadow-sm z-10 overflow-hidden">
                   {resultadosProd.map(p => (
                     <button key={p.id}
                       onClick={() => {
@@ -575,12 +575,12 @@ function NuevaVentaContent() {
                         <td className="py-2">
                           <input type="number" min={1} value={item.cantidad}
                             onChange={e => actualizarItem(idx, { cantidad: Number(e.target.value) })}
-                            className="w-full text-center text-[13px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                            className="w-full text-center text-[13px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                         </td>
                         <td className="py-2">
                           <input type="number" min={0} value={item.precio_unitario}
                             onChange={e => actualizarItem(idx, { precio_unitario: Number(e.target.value) })}
-                            className="w-full text-right text-[13px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
+                            className="w-full text-right text-[13px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-1 focus:outline-none focus:border-teal-400" />
                         </td>
                         <td className="py-2 text-right font-medium text-gray-900">
                           {formatMonto(item.cantidad * item.precio_unitario)}
@@ -605,7 +605,7 @@ function NuevaVentaContent() {
                     <input type="number" min={0} value={form.descuento_valor || ''}
                       onChange={e => setForm({ descuento_valor: Number(e.target.value) })}
                       placeholder="0"
-                      className="w-20 text-right text-[13px] text-gray-900 bg-white border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400" />
+                      className="w-20 text-right text-[13px] text-gray-900 bg-surface border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:border-teal-400" />
                     {form.descuento_valor > 0 && (
                       <span className="text-[11px] text-gray-500">
                         {form.descuento_tipo === 'pct'
@@ -620,7 +620,7 @@ function NuevaVentaContent() {
           </div>
 
           {/* Cliente */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="text-[13px] font-medium text-gray-900">Cliente</div>
               {!mostrarCliente && !clienteSeleccionado && (
@@ -650,7 +650,7 @@ function NuevaVentaContent() {
                     value={busquedaCli} onChange={e => setBusquedaCli(e.target.value)} autoFocus
                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                   {resultadosCli.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
                       {resultadosCli.map(c => (
                         <button key={c.id} onClick={() => seleccionarCliente(c)}
                           className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left border-b border-gray-100 last:border-0">
@@ -689,7 +689,7 @@ function NuevaVentaContent() {
         <div className="flex flex-col gap-4">
 
           {/* Método de pago */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Método de pago</div>
             <div className="grid grid-cols-3 gap-2">
               {([
@@ -725,7 +725,7 @@ function NuevaVentaContent() {
                     <input type="number" min={0} value={form.monto_sena || ''}
                       onChange={e => setForm({ monto_sena: Number(e.target.value) })}
                       placeholder="Monto de la seña"
-                      className="flex-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400" />
+                      className="flex-1 text-sm text-gray-900 bg-surface border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:border-teal-400" />
                     <span className="text-[11px] text-gray-400">efectivo</span>
                   </div>
                 )}
@@ -734,7 +734,7 @@ function NuevaVentaContent() {
           </div>
 
           {/* Entrega */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4">
             <div className="text-[13px] font-medium text-gray-900 mb-3">Entrega</div>
             {form.metodo_pago !== 'mercadopago' ? (
               <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -758,7 +758,7 @@ function NuevaVentaContent() {
           </div>
 
           {/* Totales */}
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
+          <div className="bg-surface border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
               <div className="flex justify-between text-[12px]">
                 <span className="text-gray-600">Subtotal</span>

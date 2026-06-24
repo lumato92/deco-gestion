@@ -351,7 +351,7 @@ export function ModalAccionesVenta({ venta, onCompletado, onCerrar }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl border border-gray-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+      <div className="bg-surface rounded-xl border border-gray-200 w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -533,7 +533,7 @@ export function ModalAccionesVenta({ venta, onCompletado, onCerrar }: Props) {
                           onChange={e => setCantDevuelta(prev => ({
                             ...prev, [i.id]: Math.min(i.cantidad, Math.max(0, Number(e.target.value)))
                           }))}
-                          className="w-16 text-center text-[13px] text-gray-900 bg-white border border-gray-300 rounded-lg px-1 py-1 focus:outline-none focus:border-teal-400"
+                          className="w-16 text-center text-[13px] text-gray-900 bg-surface border border-gray-300 rounded-lg px-1 py-1 focus:outline-none focus:border-teal-400"
                         />
                         <span className="text-[11px] text-gray-400">/ {i.cantidad}</span>
                       </div>
@@ -578,7 +578,7 @@ export function ModalAccionesVenta({ venta, onCompletado, onCerrar }: Props) {
                             onChange={e => setCantDevuelta(prev => ({
                               ...prev, [i.id]: Math.min(i.cantidad, Math.max(0, Number(e.target.value)))
                             }))}
-                            className="w-14 text-center text-[12px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-teal-400"
+                            className="w-14 text-center text-[12px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:border-teal-400"
                           />
                           <span className="text-[11px] text-gray-400">/ {i.cantidad}</span>
                         </div>
@@ -601,7 +601,7 @@ export function ModalAccionesVenta({ venta, onCompletado, onCerrar }: Props) {
                     value={busquedaProd} onChange={e => setBusquedaProd(e.target.value)}
                     className="w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                   {resultadosProd.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-gray-200 rounded-lg z-10 overflow-hidden shadow-sm">
                       {resultadosProd.map(p => (
                         <button key={p.id}
                           onClick={() => {
@@ -631,7 +631,7 @@ export function ModalAccionesVenta({ venta, onCompletado, onCerrar }: Props) {
                           onChange={e => setItemsCambio(prev => prev.map((item: any, j: number) =>
                             j === idx ? { ...item, cantidad: Number(e.target.value) } : item
                           ))}
-                          className="w-14 text-center text-[12px] text-gray-900 bg-white border border-gray-300 rounded px-1 py-0.5 focus:outline-none" />
+                          className="w-14 text-center text-[12px] text-gray-900 bg-surface border border-gray-300 rounded px-1 py-0.5 focus:outline-none" />
                         <span className="text-[11px] text-gray-500 w-16 text-right">{formatMonto(i.precio_unitario)}</span>
                         <button onClick={() => setItemsCambio(prev => prev.filter((_: any, j: number) => j !== idx))}
                           className="text-gray-300 hover:text-red-400">×</button>
