@@ -153,7 +153,7 @@ function DetalleCliente({ cliente, onCerrar, onEditar, onNuevaVenta }: {
     <tr>
       <td colSpan={8} className="p-0">
         <div className="bg-gray-50 border-t border-gray-200 p-4">
-          <div className="grid grid-cols-[200px_1fr_220px] gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_220px] gap-4">
 
             {/* Info del cliente */}
             <div className="flex flex-col gap-3">
@@ -308,7 +308,7 @@ export default function ClientesPage() {
       )}
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Negocio</p>
           <h1 className="text-base font-medium text-gray-900">Clientes</h1>
@@ -322,7 +322,7 @@ export default function ClientesPage() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Total clientes',   valor: stats.total,         sub: 'registrados', fmt: false },
           { label: 'Con compras',      valor: stats.conCompras,    sub: 'compraron al menos una vez', fmt: false },
@@ -376,6 +376,7 @@ export default function ClientesPage() {
             {loading ? 'Cargando...' : `${clientes.length} clientes · clic en una fila para ver historial`}
           </span>
         </div>
+        <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
@@ -476,6 +477,7 @@ export default function ClientesPage() {
             }
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

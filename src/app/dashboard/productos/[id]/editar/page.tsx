@@ -197,7 +197,7 @@ function FormProducto({ id }: { id: number | null }) {
 
   return (
     <div className="p-5 flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">
             Catálogo › Productos › {esNuevo ? 'Nuevo' : 'Editar'}
@@ -222,7 +222,7 @@ function FormProducto({ id }: { id: number | null }) {
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>
       )}
 
-      <div className="grid grid-cols-[1fr_280px] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4 items-start">
 
         <div className="flex flex-col gap-4">
 

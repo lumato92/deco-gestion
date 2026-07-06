@@ -180,7 +180,7 @@ export default function UsuariosPage() {
       )}
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Administración</p>
           <h1 className="text-base font-medium text-gray-900">Usuarios</h1>
@@ -192,7 +192,7 @@ export default function UsuariosPage() {
       </div>
 
       {/* Info de roles */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { rol: 'root',  desc: 'Acceso total. Gestiona usuarios. No se puede crear desde este panel.' },
           { rol: 'admin', desc: 'Acceso total al sistema: ventas, productos, insumos, gastos y finanzas.' },
@@ -211,6 +211,7 @@ export default function UsuariosPage() {
 
       {/* Tabla */}
       <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
@@ -279,6 +280,7 @@ export default function UsuariosPage() {
             }
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

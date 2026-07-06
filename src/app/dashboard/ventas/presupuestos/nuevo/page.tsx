@@ -232,7 +232,7 @@ export default function NuevoPresupuestoPage() {
       )}
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Ventas › Presupuestos › Nuevo</p>
           <h1 className="text-base font-medium text-gray-900">Nuevo presupuesto</h1>
@@ -243,7 +243,7 @@ export default function NuevoPresupuestoPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-[1fr_320px] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-start">
 
         {/* COLUMNA IZQUIERDA */}
         <div className="flex flex-col gap-4">

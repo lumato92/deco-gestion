@@ -442,7 +442,7 @@ function NuevaVentaContent() {
       )}
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Ventas › Nueva venta</p>
           <h1 className="text-base font-medium text-gray-900">Nueva venta</h1>
@@ -472,7 +472,7 @@ function NuevaVentaContent() {
       )}
 
       {/* Fecha + Canal — fila compacta */}
-      <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4">
+      <div className="bg-surface border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-1">
           <label className="text-[11px] text-gray-500 uppercase tracking-wide whitespace-nowrap">Fecha de la venta</label>
           <input
@@ -495,7 +495,7 @@ function NuevaVentaContent() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[1fr_320px] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 items-start">
 
         {/* COLUMNA IZQUIERDA */}
         <div className="flex flex-col gap-4">

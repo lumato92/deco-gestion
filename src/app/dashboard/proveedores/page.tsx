@@ -282,7 +282,7 @@ function DetalleProveedor({ p, onCerrar }: { p: Proveedor; onCerrar: () => void 
   return (
     <tr>
       <td colSpan={6} className="p-0">
-        <div className="bg-gray-50 border-t border-gray-200 p-4 grid grid-cols-3 gap-6">
+        <div className="bg-gray-50 border-t border-gray-200 p-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           <div>
             <div className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-2">Datos fiscales</div>
@@ -401,7 +401,7 @@ export default function ProveedoresPage() {
       )}
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Negocio</p>
           <h1 className="text-base font-medium text-gray-900">Proveedores</h1>
@@ -413,7 +413,7 @@ export default function ProveedoresPage() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Total proveedores', valor: todos.length },
           { label: 'Activos',           valor: todos.filter(p => p.activo).length },
@@ -455,6 +455,7 @@ export default function ProveedoresPage() {
         <div className="px-4 py-3 border-b border-gray-100 text-xs text-gray-400">
           {loading ? 'Cargando...' : `${proveedores.length} proveedores · clic en una fila para ver detalle`}
         </div>
+        <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
@@ -539,6 +540,7 @@ export default function ProveedoresPage() {
             }
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

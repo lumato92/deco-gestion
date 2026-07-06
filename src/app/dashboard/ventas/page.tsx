@@ -252,7 +252,7 @@ function ModalCobrar({ venta, onGuardar, onCerrar }: {
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Método de pago</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(['efectivo', 'transferencia', 'debito', 'credito'] as MetodoPago[]).map(key => (
                 <button key={key} type="button" onClick={() => setMetodo(key)}
                   className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
@@ -550,7 +550,7 @@ export default function VentasPage() {
       <BannerPagosPoint onAsignado={() => { recargar(); cargarVentasConPoint() }} />
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Ventas</p>
           <h1 className="text-base font-medium text-gray-900">Todas las ventas</h1>
@@ -567,7 +567,7 @@ export default function VentasPage() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: 'Total del período', valor: totalPeriodo,   sub: `${ventas.length} ventas` },
           { label: 'Cobrado',           valor: totalCobrado,   sub: totalPeriodo > 0 ? `${Math.round(totalCobrado / totalPeriodo * 100)}% del total` : '—' },
@@ -586,7 +586,7 @@ export default function VentasPage() {
       </div>
 
       {/* Cards método de pago */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {metodos.map(m => {
           const cant = ventas.filter(v => v.metodo_pago === m.key).length
           return (
@@ -670,6 +670,7 @@ export default function VentasPage() {
           </select>
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
@@ -804,6 +805,7 @@ export default function VentasPage() {
             }
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )
