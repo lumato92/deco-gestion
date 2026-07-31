@@ -136,7 +136,7 @@ export default function FinanzasPage() {
     <div className="p-5 flex flex-col gap-4">
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Negocio</p>
           <h1 className="text-base font-medium text-gray-900">Finanzas</h1>
@@ -181,7 +181,7 @@ export default function FinanzasPage() {
       </div>
 
       {/* Métricas del mes — fila 1 (montos, con comparación vs mes anterior) */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricaCard label="Ingresos" valor={mesActual.ingresos}
           sub={`${mesActual.cant_pedidos} ventas`} loading={loading}
           delta={delta(mesActual.ingresos, mesAnterior.ingresos)} />
@@ -198,7 +198,7 @@ export default function FinanzasPage() {
       </div>
 
       {/* Métricas del mes — fila 2 (ratios y costos) */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricaCard label="Margen bruto" valor={mesActual.margen_pct} esMonto={false}
           sub="ganancia / ingresos" loading={loading}
           color={mesActual.margen_pct >= 40 ? 'text-teal-700' : mesActual.margen_pct >= 20 ? 'text-amber-700' : 'text-red-600'} />
@@ -247,7 +247,7 @@ export default function FinanzasPage() {
       </div>
 
       {/* Fila: gastos vs ingresos + desglose métodos */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Gráfico de barras ingresos vs gastos */}
         <div className="bg-surface border border-gray-200 rounded-xl p-4">
@@ -309,7 +309,7 @@ export default function FinanzasPage() {
       </div>
 
       {/* Fila: resultado neto histórico + gastos por categoría + top clientes */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Resultado neto */}
         <div className="bg-surface border border-gray-200 rounded-xl p-4">
@@ -402,7 +402,7 @@ export default function FinanzasPage() {
       </div>
 
       {/* Tesorería: cuentas por cobrar · caja vs banco · inventario */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Cuentas por cobrar */}
         <div className="bg-surface border border-gray-200 rounded-xl p-4">
@@ -521,10 +521,10 @@ export default function FinanzasPage() {
       )}
 
       {/* Fila: top productos + ventas por canal */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Top productos */}
-        <div className="bg-surface border border-gray-200 rounded-xl p-4 col-span-2">
+        <div className="bg-surface border border-gray-200 rounded-xl p-4 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div className="text-[13px] font-medium text-gray-900">Top productos del mes</div>
             <div className="flex border border-gray-200 rounded-lg overflow-hidden">
@@ -623,6 +623,7 @@ export default function FinanzasPage() {
         <div className="px-4 py-3 border-b border-gray-100">
           <span className="text-[13px] font-medium text-gray-900">Resumen por mes</span>
         </div>
+        <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
@@ -675,6 +676,7 @@ export default function FinanzasPage() {
             }
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

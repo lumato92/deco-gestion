@@ -92,7 +92,7 @@ export default function PresupuestosPage() {
       )}
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Ventas › Presupuestos</p>
           <h1 className="text-base font-medium text-gray-900">Presupuestos</h1>
@@ -106,7 +106,7 @@ export default function PresupuestosPage() {
       </div>
 
       {/* Métricas rápidas */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'Presupuestos activos', valor: presupuestos.length, fmt: false },
           { label: 'Valor total',           valor: presupuestos.reduce((s, p) => s + p.total_cobrado, 0), fmt: true },
@@ -133,6 +133,7 @@ export default function PresupuestosPage() {
           </span>
         </div>
 
+        <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-100">
@@ -210,6 +211,7 @@ export default function PresupuestosPage() {
             }
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

@@ -9,7 +9,7 @@ import {
   LayoutDashboard, ShoppingCart, ListOrdered, FileText,
   Package, Boxes, ShoppingBag, Truck, ClipboardList,
   Users, TrendingUp, Receipt, Factory, UserCog,
-  Moon, Sun, LogOut, type LucideIcon,
+  Moon, Sun, LogOut, Menu, X, type LucideIcon,
 } from 'lucide-react'
 
 function cn(...classes: (string | boolean | undefined)[]) {
@@ -59,6 +59,12 @@ export default function Sidebar() {
   const router = useRouter()
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null)
   const [cerrando, setCerrando] = useState(false)
+  const [menuAbierto, setMenuAbierto] = useState(false)
+
+  // Cierra el drawer al navegar a otra página
+  useEffect(() => {
+    setMenuAbierto(false)
+  }, [path])
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -124,9 +130,8 @@ export default function Sidebar() {
     }] : []),
   ]
 
-  return (
-    <aside className="w-[210px] border-r border-gray-200 bg-gray-50 flex flex-col flex-shrink-0">
-
+  const contenido = (
+    <>
       {/* Logo */}
       <div className="px-4 py-4 border-b border-gray-200">
         <span className="text-sm font-medium text-gray-900">Deco gestión</span>
@@ -196,6 +201,45 @@ export default function Sidebar() {
           </button>
         </div>
       )}
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Barra superior (solo móvil) */}
+      <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+        <button
+          onClick={() => setMenuAbierto(true)}
+          aria-label="Abrir menú"
+          className="p-1 -ml-1 text-gray-600 hover:text-gray-900"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <span className="text-sm font-medium text-gray-900">Deco gestión</span>
+      </div>
+
+      {/* Sidebar fijo (solo desktop) */}
+      <aside className="hidden md:flex w-[210px] border-r border-gray-200 bg-gray-50 flex-col flex-shrink-0">
+        {contenido}
+      </aside>
+
+      {/* Drawer (solo móvil) */}
+      {menuAbierto && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <aside className="w-[250px] max-w-[80vw] bg-gray-50 border-r border-gray-200 flex flex-col overflow-y-auto shadow-xl">
+            {contenido}
+          </aside>
+          <div className="flex-1 bg-black/40" onClick={() => setMenuAbierto(false)}>
+            <button
+              aria-label="Cerrar menú"
+              className="p-3 text-white"
+              onClick={() => setMenuAbierto(false)}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

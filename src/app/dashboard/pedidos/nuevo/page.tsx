@@ -85,7 +85,7 @@ export default function NuevoPedidoPage() {
 
   return (
     <div className="p-5 flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Pedidos › Nuevo pedido</p>
           <h1 className="text-base font-medium text-gray-900">Nueva orden de compra</h1>
@@ -100,7 +100,7 @@ export default function NuevoPedidoPage() {
         Pedido previo al proveedor — se genera la OC, el stock se actualiza al confirmar la recepción.
       </div>
 
-      <div className="grid grid-cols-[1fr_300px] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 items-start">
 
         {/* IZQUIERDA */}
         <div className="flex flex-col gap-4">

@@ -60,7 +60,7 @@ export default function DashboardPage() {
     <div className="p-5 flex flex-col gap-4">
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Dashboard</p>
           <h1 className="text-base font-medium text-gray-900 capitalize">{fecha}</h1>
@@ -82,7 +82,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Fila 1: Métricas financieras ── */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           {
             label: 'Ingresos del mes',
@@ -131,7 +131,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Fila 2: Balance MP + Pagos Point pendientes + Presupuestos ── */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
 
         {/* Balance MP */}
         <div className="bg-surface border border-gray-200 rounded-xl p-4 flex flex-col gap-3">
@@ -225,7 +225,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Fila 3: Últimas ventas + Top productos ── */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Últimas 5 ventas */}
         <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">
@@ -233,6 +233,7 @@ export default function DashboardPage() {
             <span className="text-[13px] font-medium text-gray-900">Últimas ventas</span>
             <Link href="/dashboard/ventas" className="text-[11px] text-teal-600 hover:underline">Ver todas →</Link>
           </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
             <thead>
               <tr className="bg-gray-50">
@@ -275,6 +276,7 @@ export default function DashboardPage() {
               }
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Top 5 productos */}
@@ -307,7 +309,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Fila 4: Alertas stock + Fabricación + Pagos Point detalle ── */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Alertas de stock */}
         <div className="bg-surface border border-gray-200 rounded-xl overflow-hidden">

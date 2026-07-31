@@ -384,7 +384,7 @@ export default function EditarPresupuestoPage() {
       )}
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Ventas › Presupuestos › Editar #{id}</p>
           <h1 className="text-base font-medium text-gray-900">Editar presupuesto</h1>
@@ -405,7 +405,7 @@ export default function EditarPresupuestoPage() {
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>
       )}
 
-      <div className="grid grid-cols-[1fr_300px] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 items-start">
 
         {/* IZQUIERDA */}
         <div className="flex flex-col gap-4">

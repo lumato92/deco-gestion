@@ -97,7 +97,7 @@ function ModalGasto({ gasto, onGuardar, onCerrar }: {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] text-gray-500 uppercase tracking-wide">Método de pago</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(['efectivo', 'transferencia', 'debito', 'credito'] as Array<'efectivo' | 'transferencia' | 'debito' | 'credito'>).map(key => (
                 <button key={key} type="button" onClick={() => setMetodoPago(key)}
                   className={`py-2 text-xs font-medium rounded-lg border transition-colors ${
@@ -366,7 +366,7 @@ export default function GastosPage() {
       )}
 
       {/* Topbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-xs text-gray-400 mb-1">Negocio</p>
           <h1 className="text-base font-medium text-gray-900">Gastos</h1>
@@ -390,7 +390,7 @@ export default function GastosPage() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: rangoActivo ? 'Total del período' : mostrandoRecientes ? 'Últimos gastos' : 'Total del mes',    valor: totalMes,                      sub: `${todos.length} gastos` },
           { label: 'Salió de caja',    valor: porMetodo.efectivo,  sub: 'efectivo' },
@@ -412,7 +412,7 @@ export default function GastosPage() {
       {vista === 'listado' && (
         <>
           {/* Cards métodos de pago */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {Object.entries(MP_CFG).map(([key, cfg]) => {
               const monto = porMetodo[key as keyof typeof porMetodo] ?? 0
               const cant = todos.filter(g => g.metodo_pago === key).length
@@ -485,6 +485,7 @@ export default function GastosPage() {
                 <option value="menor">Menor a mayor</option>
               </select>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
@@ -556,6 +557,7 @@ export default function GastosPage() {
                 }
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}
