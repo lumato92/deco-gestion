@@ -9,7 +9,7 @@ export type EstadoPedido =
   | 'cancelado'
 
 export type MetodoPago = 'efectivo' | 'transferencia' | 'debito' | 'credito' | 'mercadopago'
-export type CanalVenta = 'directo' | 'whatsapp' | 'instagram' | 'tienda' | 'ecommerce'
+export type CanalVenta = 'directo' | 'whatsapp' | 'instagram' | 'tienda' | 'ecommerce' | 'mercadolibre'
 
 export interface Cliente {
   id: number
@@ -37,6 +37,8 @@ export interface Producto {
   slug?: string
   descripcion_corta?: string
   estado: 'activo' | 'pausado' | 'descontinuado'
+  /** ID de la publicación en Mercado Libre ("MLA123456789"). Match orden ML → producto. */
+  ml_item_id?: string
   // desde vista productos_con_margen:
   categoria_nombre?: string
   subcategoria_nombre?: string
@@ -79,6 +81,10 @@ export interface PedidoConTotal {
   fecha_entrega?: string
   fecha_compromiso_fabricacion?: string
   fecha_llegada_fabricacion?: string
+  /** ID de la orden en Mercado Libre. Solo en pedidos importados; clave de idempotencia. */
+  ml_order_id?: string
+  /** false = algún item del pedido de ML no matcheó un producto interno. */
+  conciliado?: boolean
   cant_items: number
   subtotal: number
   costo_total: number
