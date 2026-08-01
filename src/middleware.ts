@@ -9,7 +9,22 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
 // Rutas públicas — no requieren login
-const rutasPublicas = ['/login', '/api/auth/login', '/api/pagos/webhook', '/api/pagos/link']
+//
+// Los webhooks entran sin cookie de sesión: si el middleware los manda al
+// login, el proveedor recibe un 307 y la notificación se pierde.
+//   · /api/ml/webhook        → lo postea Mercado Libre. Se autentica
+//     revalidando la orden contra la API de ML, no por la sesión.
+//   · /api/ml/oauth/callback → vuelve desde auth.mercadolibre.com. Se protege
+//     con el cookie `state`, que solo puede emitir /api/ml/oauth/iniciar
+//     (que sí requiere login).
+const rutasPublicas = [
+  '/login',
+  '/api/auth/login',
+  '/api/pagos/webhook',
+  '/api/pagos/link',
+  '/api/ml/webhook',
+  '/api/ml/oauth/callback',
+]
 if (rutasPublicas.some(r => pathname.startsWith(r))) {
   return NextResponse.next()
 }
