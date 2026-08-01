@@ -217,6 +217,63 @@ export async function importarOrden(
   }
 }
 
+export interface Previsualizacion {
+  mlOrderId: string
+  estado: string
+  /** true si el importador la tomaría (está paga y tiene items). */
+  importable: boolean
+  yaImportada: boolean
+  pedidoExistente: number | null
+  /** Publicaciones que no matchean ningún producto interno. */
+  sinMatch: string[]
+  total: number
+  comision: number
+  fecha: string
+}
+
+/**
+ * Qué pasaría si importáramos esta orden, sin escribir nada.
+ *
+ * Es lo que hace usable el backfill sobre ventas reales: antes de meter un mes
+ * entero de pedidos conviene ver cuántos van a entrar sin conciliar por falta
+ * de ml_item_id, y arreglar el mapeo primero.
+ */
+export async function previsualizarOrden(
+  supabase: SupabaseClient,
+  orden: OrdenML
+): Promise<Previsualizacion> {
+  const mlOrderId = String(orden.id)
+
+  const { data: existente } = await supabase
+    .from('pedidos')
+    .select('id')
+    .eq('ml_order_id', mlOrderId)
+    .maybeSingle()
+
+  const importable =
+    ESTADOS_IMPORTABLES.has(orden.status) && orden.order_items.length > 0
+
+  let sinMatch: string[] = []
+  if (importable && !existente) {
+    const productos = await matchearProductos(supabase, orden)
+    sinMatch = orden.order_items
+      .filter(l => !productos.has(l.item.id))
+      .map(l => `${l.item.id} (${l.item.title})`)
+  }
+
+  return {
+    mlOrderId,
+    estado: orden.status,
+    importable,
+    yaImportada: Boolean(existente),
+    pedidoExistente: existente?.id ?? null,
+    sinMatch,
+    total: orden.total_amount,
+    comision: calcularComision(orden),
+    fecha: orden.date_closed ?? orden.date_created,
+  }
+}
+
 /** Deja constancia en la tabla de auditoría. Nunca tira: es observabilidad. */
 export async function registrarImportacion(
   supabase: SupabaseClient,

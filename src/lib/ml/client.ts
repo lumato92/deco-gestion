@@ -105,6 +105,60 @@ export function idDesdeResource(resource: string | undefined | null): string | n
   return match ? match[1] : null
 }
 
+export interface PaginaOrdenes {
+  ids: string[]
+  total: number
+}
+
+/**
+ * Busca órdenes del vendedor en un rango de fechas.
+ *
+ * Devuelve solo los ids: el backfill después trae cada orden con fetchOrden(),
+ * el mismo camino que usa el webhook. Cuesta una request extra por orden pero
+ * garantiza que backfill e importación automática vean exactamente los mismos
+ * datos, en vez de tener dos formas distintas de leer una orden.
+ *
+ * ML pide las fechas en ISO con precisión de hora (descarta minutos y abajo).
+ */
+export async function buscarOrdenes(
+  supabase: SupabaseClient,
+  opciones: {
+    sellerId: string
+    desde: string
+    hasta?: string
+    offset?: number
+    limit?: number
+  }
+): Promise<PaginaOrdenes> {
+  const params = new URLSearchParams({
+    seller: opciones.sellerId,
+    'order.status': 'paid',
+    sort: 'date_asc',
+    offset: String(opciones.offset ?? 0),
+    limit: String(opciones.limit ?? 50),
+  })
+  params.set('order.date_created.from', aFechaML(opciones.desde))
+  if (opciones.hasta) params.set('order.date_created.to', aFechaML(opciones.hasta))
+
+  const respuesta = await getML<{
+    results?: { id: number }[]
+    paging?: { total?: number }
+  }>(supabase, `/orders/search?${params.toString()}`, opciones.sellerId)
+
+  if (!respuesta) return { ids: [], total: 0 }
+
+  return {
+    ids: (respuesta.results ?? []).map(o => String(o.id)),
+    total: respuesta.paging?.total ?? 0,
+  }
+}
+
+/** '2026-07-01' → '2026-07-01T00:00:00.000-00:00' (formato que espera ML). */
+export function aFechaML(fecha: string): string {
+  if (fecha.includes('T')) return fecha
+  return `${fecha}T00:00:00.000-00:00`
+}
+
 /** Trae la orden real desde ML. null = no existe (notificación no confiable). */
 export async function fetchOrden(
   supabase: SupabaseClient,
