@@ -203,6 +203,19 @@ export function useCompras(soloTipo?: 'directa' | 'pedido') {
           }))
         )
         if (errPagos) throw errPagos
+
+        // Registrar cada pago como gasto para que aparezca en finanzas
+        await supabase.from('gastos').insert(
+          pagos.map(p => ({
+            categoria: 'Insumos',
+            descripcion: `Compra #${compraId}`,
+            monto: p.monto,
+            fecha: p.fecha,
+            recurrente: false,
+            metodo_pago: p.metodo_pago === 'credito' ? 'credito' : p.metodo_pago,
+            notas: p.notas ?? null,
+          }))
+        )
       }
 
       if (datos.estado === 'recibida' || datos.estado === 'recibida_parcial') {
@@ -261,7 +274,8 @@ export function useCompras(soloTipo?: 'directa' | 'pedido') {
     compraId: number,
     pago: PagoCompra,
     totalLineas: number,
-    totalPagadoActual: number
+    totalPagadoActual: number,
+    proveedorNombre?: string | null
   ): Promise<boolean> => {
     const supabase = createClient()
     try {
@@ -272,6 +286,19 @@ export function useCompras(soloTipo?: 'directa' | 'pedido') {
         metodo_pago: pago.metodo_pago,
         notas: pago.notas ?? null,
       })
+
+      // Registrar el pago como gasto para que aparezca en finanzas
+      const metodoGasto = pago.metodo_pago === 'credito' ? 'credito' : pago.metodo_pago as 'efectivo' | 'transferencia' | 'credito'
+      await supabase.from('gastos').insert({
+        categoria: 'Insumos',
+        descripcion: `Compra #${compraId}${proveedorNombre ? ` — ${proveedorNombre}` : ''}`,
+        monto: pago.monto,
+        fecha: pago.fecha,
+        recurrente: false,
+        metodo_pago: metodoGasto,
+        notas: pago.notas ?? null,
+      })
+
       const nuevoPagado = totalPagadoActual + pago.monto
       const nuevoEstado = nuevoPagado >= totalLineas ? 'pagado' : 'parcial'
       await supabase.from('compras')

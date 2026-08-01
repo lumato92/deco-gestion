@@ -7,8 +7,15 @@
 //     stock se mueve.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { importarOrden, calcularComision } from './importar-orden'
+import { importarOrden, calcularComision, calcularImpuestos } from './importar-orden'
 import type { OrdenML } from './types'
+
+// El costo de envío sale de otra llamada a la API: la mockeamos.
+vi.mock('./client', () => ({
+  costoEnvioVendedor: vi.fn(async () => 0),
+}))
+import { costoEnvioVendedor } from './client'
+const envioMock = vi.mocked(costoEnvioVendedor)
 
 // Las alertas salen por red: las silenciamos y las inspeccionamos.
 vi.mock('./alertas', () => ({
@@ -20,6 +27,8 @@ const alertaMock = vi.mocked(enviarAlerta)
 
 beforeEach(() => {
   alertaMock.mockClear()
+  envioMock.mockClear()
+  envioMock.mockResolvedValue(0)
 })
 
 function orden(cambios: Partial<OrdenML> = {}): OrdenML {
@@ -50,6 +59,7 @@ function orden(cambios: Partial<OrdenML> = {}): OrdenML {
  */
 function fakeSupabase(opciones: {
   pedidoExistente?: number | null
+  /** Vínculos publicación → producto, como los devuelve ml_publicaciones. */
   productos?: { id: number; costo: number; ml_item_id: string }[]
   pedidoId?: number
   rpcStock?: { data: unknown; error: { message: string } | null }
@@ -57,6 +67,7 @@ function fakeSupabase(opciones: {
 } = {}) {
   const inserts: { tabla: string; payload: unknown }[] = []
   const pedidoId = opciones.pedidoId ?? 501
+  const vinculados = opciones.productos ?? []
 
   const cliente = {
     from(tabla: string) {
@@ -69,7 +80,19 @@ function fakeSupabase(opciones: {
                 error: null,
               }),
             }),
-            in: async () => ({ data: opciones.productos ?? [], error: null }),
+            in: async () => {
+              // ml_publicaciones devuelve los vínculos; productos, los costos.
+              if (tabla === 'ml_publicaciones') {
+                return {
+                  data: vinculados.map(p => ({ ml_item_id: p.ml_item_id, producto_id: p.id })),
+                  error: null,
+                }
+              }
+              return {
+                data: vinculados.map(p => ({ id: p.id, costo: p.costo })),
+                error: null,
+              }
+            },
           }
         },
         insert(payload: unknown) {
@@ -124,7 +147,12 @@ describe('idempotencia', () => {
         return {
           select: () => ({
             eq: () => ({ maybeSingle: async () => ({ data: existente ? { id: existente } : null, error: null }) }),
-            in: async () => ({ data: [{ id: 1, costo: 12000, ml_item_id: 'MLA111' }], error: null }),
+            in: async () => ({
+              data: tabla === 'ml_publicaciones'
+                ? [{ ml_item_id: 'MLA111', producto_id: 1 }]
+                : [{ id: 1, costo: 12000 }],
+              error: null,
+            }),
           }),
           insert: (payload: unknown) => {
             if (tabla === 'pedidos') { existente = 900; inserts.push(payload) }
@@ -205,9 +233,42 @@ describe('mapeo orden → pedido', () => {
 
     expect(inserts.find(i => i.tabla === 'pagos_pedido')?.payload).toMatchObject({
       monto: 60000,
-      comisiones: 7800,
+      comisiones: 15600, // sale_fee 7800 × 2 unidades
       metodo_pago: 'mercadopago',
     })
+  })
+
+  it('descuenta también el envío que paga el vendedor', async () => {
+    // Caso real: envío gratis para el comprador, el flete lo absorbe el vendedor.
+    envioMock.mockResolvedValue(9860)
+    const { supabase, inserts } = fakeSupabase({
+      productos: [{ id: 1, costo: 12000, ml_item_id: 'MLA111' }],
+    })
+
+    await importarOrden(supabase, orden({ shipping: { id: 47577813594 } }), { sellerId: '99212759' })
+
+    const pago = inserts.find(i => i.tabla === 'pagos_pedido')?.payload as Record<string, unknown>
+    // (7800 × 2 unidades) de comisión + 9860 de flete
+    expect(pago.comisiones).toBe(25460)
+    expect(pago.notas).toContain('Envío $9860')
+  })
+
+  it('importa igual y alerta si no se puede leer el costo de envío', async () => {
+    envioMock.mockRejectedValue(new Error('500 de ML'))
+    const { supabase, inserts } = fakeSupabase({
+      productos: [{ id: 1, costo: 12000, ml_item_id: 'MLA111' }],
+    })
+
+    const r = await importarOrden(supabase, orden({ shipping: { id: 123 } }))
+
+    expect(r.resultado).toBe('importada')
+    // Sin el flete la ganancia queda inflada: hay que enterarse.
+    expect(alertaMock).toHaveBeenCalledWith(
+      expect.objectContaining({ titulo: 'No se pudo leer el costo de envío de una venta de ML' })
+    )
+    const pago = inserts.find(i => i.tabla === 'pagos_pedido')?.payload as Record<string, unknown>
+    // Solo la comisión: el flete no se pudo leer y queda sin descontar.
+    expect(pago.comisiones).toBe(15600)
   })
 
   it('usa el costo del producto interno, no el de ML', async () => {
@@ -230,7 +291,26 @@ describe('mapeo orden → pedido', () => {
     ])
   })
 
-  it('suma el sale_fee de todos los items', () => {
+  it('multiplica sale_fee por la cantidad (es por unidad, no por línea)', () => {
+    // Regresión de un bug real: sumar sale_fee sin multiplicar subestimaba la
+    // comisión. Verificado contra ventas reales — dos órdenes del mismo
+    // producto, de 2 y 4 unidades, traen exactamente el mismo sale_fee.
+    const dosUnidades = orden({
+      order_items: [
+        { item: { id: 'MLA111', title: 'Almohadón' }, quantity: 2, unit_price: 32900, sale_fee: 10978.3 },
+      ],
+    })
+    const cuatroUnidades = orden({
+      order_items: [
+        { item: { id: 'MLA111', title: 'Almohadón' }, quantity: 4, unit_price: 32900, sale_fee: 10978.3 },
+      ],
+    })
+
+    expect(calcularComision(dosUnidades)).toBeCloseTo(21956.6, 2)
+    expect(calcularComision(cuatroUnidades)).toBeCloseTo(43913.2, 2)
+  })
+
+  it('suma la comisión de todos los items', () => {
     const conVariosItems = orden({
       order_items: [
         { item: { id: 'MLA1', title: 'A' }, quantity: 1, unit_price: 100, sale_fee: 13 },
@@ -238,7 +318,13 @@ describe('mapeo orden → pedido', () => {
       ],
     })
 
-    expect(calcularComision(conVariosItems)).toBe(39)
+    expect(calcularComision(conVariosItems)).toBe(13 + 26 * 2)
+  })
+
+  it('lee los impuestos si ML los informa', () => {
+    expect(calcularImpuestos(orden())).toBe(0)
+    expect(calcularImpuestos(orden({ taxes: { amount: 1500 } }))).toBe(1500)
+    expect(calcularImpuestos(orden({ taxes: { amount: null } }))).toBe(0)
   })
 
   it('cae a date_created si la orden no tiene date_closed', async () => {
@@ -269,6 +355,30 @@ describe('conciliación', () => {
     expect(alertaMock).toHaveBeenCalledWith(
       expect.objectContaining({ titulo: 'Venta de ML sin conciliar' })
     )
+  })
+
+  it('dos publicaciones del mismo producto descuentan del mismo stock', async () => {
+    // Caso real: "Lampara Hongo 18cm" está publicada dos veces (una con cuotas
+    // y otra sin), con precios distintos. Las dos tienen que apuntar al mismo
+    // producto interno — es lo que el modelo viejo de una columna no permitía.
+    const { supabase, inserts } = fakeSupabase({
+      productos: [
+        { id: 6, costo: 25000, ml_item_id: 'MLA1922186027' },
+        { id: 6, costo: 25000, ml_item_id: 'MLA1838017095' },
+      ],
+    })
+
+    const r = await importarOrden(supabase, orden({
+      order_items: [
+        { item: { id: 'MLA1922186027', title: 'Lampara Oval Hongo 18cm' }, quantity: 1, unit_price: 55000, sale_fee: 12000 },
+        { item: { id: 'MLA1838017095', title: 'Lampara Oval Hongo 18cm' }, quantity: 1, unit_price: 65000, sale_fee: 14885 },
+      ],
+    }))
+
+    expect(r.resultado).toBe('importada')
+    const items = inserts.find(i => i.tabla === 'items_pedido')?.payload as Record<string, unknown>[]
+    expect(items[0].producto_id).toBe(6)
+    expect(items[1].producto_id).toBe(6)
   })
 
   it('concilia parcialmente si solo uno de dos items matchea', async () => {

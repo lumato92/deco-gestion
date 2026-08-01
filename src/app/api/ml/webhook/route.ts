@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, motivo: 'orden_inexistente' })
     }
 
-    const resultado = await importarOrden(supabase, orden)
+    const resultado = await importarOrden(supabase, orden, { sellerId })
 
     await registrarImportacion(supabase, {
       mlOrderId: ordenId,
