@@ -160,11 +160,15 @@ export async function buscarOrdenes(
     hasta?: string
     offset?: number
     limit?: number
+    /** Estados separados por coma. Default: pagas y canceladas. */
+    estados?: string
   }
 ): Promise<PaginaOrdenes> {
   const params = new URLSearchParams({
     seller: opciones.sellerId,
-    'order.status': 'paid',
+    // Las canceladas también importan: si el envío se despachó igual, ML
+    // factura el flete y eso es un gasto real aunque no haya venta.
+    'order.status': opciones.estados ?? 'paid,cancelled',
     sort: 'date_asc',
     offset: String(opciones.offset ?? 0),
     limit: String(opciones.limit ?? 50),

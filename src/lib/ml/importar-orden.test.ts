@@ -192,6 +192,107 @@ describe('idempotencia', () => {
   })
 })
 
+describe('ventas canceladas', () => {
+  /** Fake enfocado en canceladas: controla si ya hay pedido y si ya hay gasto. */
+  function fakeCancelada(opciones: { pedido?: number; gasto?: number; errorGasto?: string } = {}) {
+    const inserts: { tabla: string; payload: Record<string, unknown> }[] = []
+    const supabase = {
+      from(tabla: string) {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data:
+                  tabla === 'pedidos'
+                    ? (opciones.pedido ? { id: opciones.pedido } : null)
+                    : (opciones.gasto ? { id: opciones.gasto } : null),
+                error: null,
+              }),
+            }),
+            in: async () => ({ data: [], error: null }),
+          }),
+          insert: (payload: Record<string, unknown>) => {
+            inserts.push({ tabla, payload })
+            return Promise.resolve({
+              data: null,
+              error: opciones.errorGasto ? { message: opciones.errorGasto } : null,
+            })
+          },
+        }
+      },
+      rpc: async () => ({ data: null, error: null }),
+    }
+    return { supabase: supabase as never, inserts }
+  }
+
+  const cancelada = () => orden({ status: 'cancelled', shipping: { id: 47458155329 } })
+
+  it('registra el flete como gasto cuando el envío se despachó igual', async () => {
+    // Caso real de julio: venta caída, envío entregado, ML factura el flete.
+    envioMock.mockResolvedValue(7618)
+    const { supabase, inserts } = fakeCancelada()
+
+    const r = await importarOrden(supabase, cancelada(), { sellerId: '99212759' })
+
+    expect(r.resultado).toBe('importada')
+    const gasto = inserts.find(i => i.tabla === 'gastos')?.payload
+    expect(gasto).toMatchObject({
+      categoria: 'Flete',
+      monto: 7618,
+      ml_order_id: '2000012345678',
+      origen: 'ml',
+      fecha: '2026-07-20', // fecha de la orden, no de hoy
+    })
+    // Tiene que quedar claro qué es y de qué operación viene.
+    expect(gasto?.descripcion).toContain('cancelada')
+    expect(gasto?.descripcion).toContain('2000012345678')
+  })
+
+  it('no crea ningún pedido por una venta cancelada', async () => {
+    envioMock.mockResolvedValue(7618)
+    const { supabase, inserts } = fakeCancelada()
+
+    await importarOrden(supabase, cancelada())
+
+    expect(inserts.map(i => i.tabla)).toEqual(['gastos'])
+  })
+
+  it('no duplica el gasto si el backfill se corre de nuevo', async () => {
+    envioMock.mockResolvedValue(7618)
+    const { supabase, inserts } = fakeCancelada({ gasto: 88 })
+
+    const r = await importarOrden(supabase, cancelada())
+
+    expect(r.resultado).toBe('duplicada')
+    expect(inserts).toEqual([])
+  })
+
+  it('no registra nada si la cancelada no tuvo flete a cargo del vendedor', async () => {
+    envioMock.mockResolvedValue(0)
+    const { supabase, inserts } = fakeCancelada()
+
+    const r = await importarOrden(supabase, cancelada())
+
+    expect(r.resultado).toBe('ignorada')
+    expect(inserts).toEqual([])
+  })
+
+  it('alerta si se cancela una venta que ya estaba importada', async () => {
+    envioMock.mockResolvedValue(0)
+    const { supabase } = fakeCancelada({ pedido: 412 })
+
+    await importarOrden(supabase, cancelada())
+
+    // No se cancela sola: mapear devoluciones de ML es otro tema, y tocar el
+    // pedido por las nuestras desarma stock y cobranzas.
+    expect(alertaMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        titulo: 'Se canceló una venta de ML que ya estaba importada',
+      })
+    )
+  })
+})
+
 describe('estados de la orden', () => {
   it('ignora una orden que todavía no está paga', async () => {
     const { supabase, inserts } = fakeSupabase()
