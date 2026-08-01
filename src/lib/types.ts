@@ -37,8 +37,6 @@ export interface Producto {
   slug?: string
   descripcion_corta?: string
   estado: 'activo' | 'pausado' | 'descontinuado'
-  /** ID de la publicación en Mercado Libre ("MLA123456789"). Match orden ML → producto. */
-  ml_item_id?: string
   // desde vista productos_con_margen:
   categoria_nombre?: string
   subcategoria_nombre?: string

@@ -96,6 +96,10 @@ function notasDeOrden(orden: OrdenML): string {
 /**
  * Busca los productos internos que corresponden a las publicaciones de la orden.
  * Devuelve un mapa ml_item_id → { producto_id, costo }.
+ *
+ * Pasa por `ml_publicaciones` porque la relación es muchos a uno: el mismo
+ * producto puede estar publicado varias veces (por ejemplo, una publicación
+ * con cuotas y otra sin), y todas tienen que descontar del mismo stock.
  */
 async function matchearProductos(
   supabase: SupabaseClient,
@@ -103,17 +107,39 @@ async function matchearProductos(
 ): Promise<Map<string, { id: number; costo: number }>> {
   const idsPublicaciones = [...new Set(orden.order_items.map(i => i.item.id))]
 
-  const { data, error } = await supabase
-    .from('productos')
-    .select('id, costo, ml_item_id')
+  const { data: vinculos, error: errVinculos } = await supabase
+    .from('ml_publicaciones')
+    .select('ml_item_id, producto_id')
     .in('ml_item_id', idsPublicaciones)
 
-  if (error) throw new Error(`Error buscando productos por ml_item_id: ${error.message}`)
+  if (errVinculos) {
+    throw new Error(`Error buscando publicaciones de ML: ${errVinculos.message}`)
+  }
 
   const mapa = new Map<string, { id: number; costo: number }>()
-  for (const fila of data ?? []) {
-    if (fila.ml_item_id) mapa.set(fila.ml_item_id, { id: fila.id, costo: fila.costo ?? 0 })
+  if (!vinculos?.length) return mapa
+
+  const idsProductos = [...new Set(vinculos.map(v => v.producto_id))]
+  const { data: productos, error: errProductos } = await supabase
+    .from('productos')
+    .select('id, costo')
+    .in('id', idsProductos)
+
+  if (errProductos) {
+    throw new Error(`Error buscando productos: ${errProductos.message}`)
   }
+
+  const costos = new Map<number, number>()
+  for (const p of productos ?? []) costos.set(p.id, p.costo ?? 0)
+
+  for (const v of vinculos) {
+    // Un vínculo que apunta a un producto borrado se ignora: mejor que entre
+    // sin conciliar y con alerta, a que reviente la importación.
+    if (costos.has(v.producto_id)) {
+      mapa.set(v.ml_item_id, { id: v.producto_id, costo: costos.get(v.producto_id)! })
+    }
+  }
+
   return mapa
 }
 

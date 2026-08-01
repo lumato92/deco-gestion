@@ -44,7 +44,7 @@ function ModalPagar({ compra, onCompletado, onCerrar }: {
   const handlePagar = async () => {
     if (monto <= 0) { setError('El monto debe ser mayor a 0'); return }
     setGuardando(true)
-    const ok = await registrarPago(compra.id, { fecha, monto, metodo_pago: metodo, notas }, compra.total_lineas, compra.total_pagado_real)
+    const ok = await registrarPago(compra.id, { fecha, monto, metodo_pago: metodo, notas }, compra.total_lineas, compra.total_pagado_real, compra.proveedor_nombre)
     if (ok) { recargar(); onCompletado(); onCerrar() }
     else { setError('Error al registrar pago'); setGuardando(false) }
   }

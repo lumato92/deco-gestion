@@ -59,6 +59,7 @@ function orden(cambios: Partial<OrdenML> = {}): OrdenML {
  */
 function fakeSupabase(opciones: {
   pedidoExistente?: number | null
+  /** Vínculos publicación → producto, como los devuelve ml_publicaciones. */
   productos?: { id: number; costo: number; ml_item_id: string }[]
   pedidoId?: number
   rpcStock?: { data: unknown; error: { message: string } | null }
@@ -66,6 +67,7 @@ function fakeSupabase(opciones: {
 } = {}) {
   const inserts: { tabla: string; payload: unknown }[] = []
   const pedidoId = opciones.pedidoId ?? 501
+  const vinculados = opciones.productos ?? []
 
   const cliente = {
     from(tabla: string) {
@@ -78,7 +80,19 @@ function fakeSupabase(opciones: {
                 error: null,
               }),
             }),
-            in: async () => ({ data: opciones.productos ?? [], error: null }),
+            in: async () => {
+              // ml_publicaciones devuelve los vínculos; productos, los costos.
+              if (tabla === 'ml_publicaciones') {
+                return {
+                  data: vinculados.map(p => ({ ml_item_id: p.ml_item_id, producto_id: p.id })),
+                  error: null,
+                }
+              }
+              return {
+                data: vinculados.map(p => ({ id: p.id, costo: p.costo })),
+                error: null,
+              }
+            },
           }
         },
         insert(payload: unknown) {
@@ -133,7 +147,12 @@ describe('idempotencia', () => {
         return {
           select: () => ({
             eq: () => ({ maybeSingle: async () => ({ data: existente ? { id: existente } : null, error: null }) }),
-            in: async () => ({ data: [{ id: 1, costo: 12000, ml_item_id: 'MLA111' }], error: null }),
+            in: async () => ({
+              data: tabla === 'ml_publicaciones'
+                ? [{ ml_item_id: 'MLA111', producto_id: 1 }]
+                : [{ id: 1, costo: 12000 }],
+              error: null,
+            }),
           }),
           insert: (payload: unknown) => {
             if (tabla === 'pedidos') { existente = 900; inserts.push(payload) }
@@ -336,6 +355,30 @@ describe('conciliación', () => {
     expect(alertaMock).toHaveBeenCalledWith(
       expect.objectContaining({ titulo: 'Venta de ML sin conciliar' })
     )
+  })
+
+  it('dos publicaciones del mismo producto descuentan del mismo stock', async () => {
+    // Caso real: "Lampara Hongo 18cm" está publicada dos veces (una con cuotas
+    // y otra sin), con precios distintos. Las dos tienen que apuntar al mismo
+    // producto interno — es lo que el modelo viejo de una columna no permitía.
+    const { supabase, inserts } = fakeSupabase({
+      productos: [
+        { id: 6, costo: 25000, ml_item_id: 'MLA1922186027' },
+        { id: 6, costo: 25000, ml_item_id: 'MLA1838017095' },
+      ],
+    })
+
+    const r = await importarOrden(supabase, orden({
+      order_items: [
+        { item: { id: 'MLA1922186027', title: 'Lampara Oval Hongo 18cm' }, quantity: 1, unit_price: 55000, sale_fee: 12000 },
+        { item: { id: 'MLA1838017095', title: 'Lampara Oval Hongo 18cm' }, quantity: 1, unit_price: 65000, sale_fee: 14885 },
+      ],
+    }))
+
+    expect(r.resultado).toBe('importada')
+    const items = inserts.find(i => i.tabla === 'items_pedido')?.payload as Record<string, unknown>[]
+    expect(items[0].producto_id).toBe(6)
+    expect(items[1].producto_id).toBe(6)
   })
 
   it('concilia parcialmente si solo uno de dos items matchea', async () => {
