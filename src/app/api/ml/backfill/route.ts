@@ -103,18 +103,20 @@ export async function POST(req: NextRequest) {
     })
 
     // ── 2. Procesar una por una ──────────────────────────────
-    const resumen: Record<ResultadoImportacion | 'no_encontrada', number> = {
+    const resumen: Record<ResultadoImportacion | 'no_encontrada' | 'gasto_flete', number> = {
       importada: 0,
       duplicada: 0,
       sin_conciliar: 0,
       ignorada: 0,
       error: 0,
       no_encontrada: 0,
+      // Canceladas cuyo envío se despachó: entran como gasto, no como pedido.
+      gasto_flete: 0,
     }
     const detalle: (Previsualizacion | { mlOrderId: string; resultado: string; pedidoId: number | null; detalle: string })[] = []
 
     // Solo en simulación: cuánto de lo facturado se lleva ML y cuánto queda.
-    const totales = { facturado: 0, comision: 0, envio: 0, impuestos: 0, neto: 0 }
+    const totales = { facturado: 0, comision: 0, envio: 0, impuestos: 0, neto: 0, gastoFlete: 0 }
 
     for (const id of aProcesar) {
       await dormir(PAUSA_MS)
@@ -137,7 +139,9 @@ export async function POST(req: NextRequest) {
           totales.impuestos += previa.impuestos
           totales.neto += previa.neto
         }
+        totales.gastoFlete += previa.gastoFlete
         if (previa.yaImportada) resumen.duplicada++
+        else if (previa.gastoFlete > 0) resumen.gasto_flete++
         else if (!previa.importable) resumen.ignorada++
         else if (previa.sinMatch.length > 0) resumen.sin_conciliar++
         else resumen.importada++

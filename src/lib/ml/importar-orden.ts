@@ -159,6 +159,10 @@ export async function importarOrden(
 
   // ── Estado: antes de 'paid' no se toca nada ────────────────
   if (!ESTADOS_IMPORTABLES.has(orden.status)) {
+    if (orden.status === 'cancelled') {
+      return manejarCancelada(supabase, orden, opciones.sellerId)
+    }
+
     return {
       resultado: 'ignorada',
       pedidoId: null,
@@ -308,6 +312,130 @@ export async function importarOrden(
   }
 }
 
+/**
+ * Orden cancelada.
+ *
+ * Dos cosas pueden pasar y ninguna es automática:
+ *
+ * 1. El envío se despachó igual. ML factura el flete aunque la venta se caiga
+ *    (caso real: orden 2000017275632908). Ese costo no tiene pedido al que
+ *    atribuirse, así que se registra como gasto de categoría Flete.
+ *
+ * 2. La orden ya se había importado como pedido. No se cancela sola: mapear
+ *    los estados de devolución de ML es un tema aparte, y cancelar un pedido
+ *    por las nuestras puede desarmar stock y cobranzas. Se alerta para que
+ *    lo revise una persona.
+ */
+async function manejarCancelada(
+  supabase: SupabaseClient,
+  orden: OrdenML,
+  sellerId?: string
+): Promise<ResultadoImportar> {
+  const mlOrderId = String(orden.id)
+
+  // ¿Ya la habíamos importado como venta?
+  const { data: pedido } = await supabase
+    .from('pedidos')
+    .select('id')
+    .eq('ml_order_id', mlOrderId)
+    .maybeSingle()
+
+  if (pedido) {
+    await enviarAlerta({
+      nivel: 'atencion',
+      titulo: 'Se canceló una venta de ML que ya estaba importada',
+      detalle: `La orden ${mlOrderId} figura cancelada en Mercado Libre, pero acá quedó como pedido #${pedido.id}. Revisalo y cancelalo a mano si corresponde: no se toca solo para no desarmar stock ni cobranzas.`,
+      contexto: { ml_order_id: mlOrderId, pedido_id: pedido.id },
+    })
+  }
+
+  // ¿Nos cobraron el flete igual?
+  let flete = 0
+  if (orden.shipping?.id) {
+    try {
+      flete = await costoEnvioVendedor(
+        supabase,
+        orden.shipping.id,
+        sellerId ?? (orden.seller ? String(orden.seller.id) : undefined)
+      )
+    } catch {
+      // Sin dato de flete no inventamos un gasto.
+      flete = 0
+    }
+  }
+
+  if (flete <= 0) {
+    return {
+      resultado: 'ignorada',
+      pedidoId: pedido?.id ?? null,
+      detalle: 'Orden cancelada sin costo de envío a cargo del vendedor.',
+    }
+  }
+
+  // Idempotencia: el backfill se puede correr de nuevo y ML reenvía avisos.
+  const { data: gastoExistente } = await supabase
+    .from('gastos')
+    .select('id')
+    .eq('ml_order_id', mlOrderId)
+    .maybeSingle()
+
+  if (gastoExistente) {
+    return {
+      resultado: 'duplicada',
+      pedidoId: pedido?.id ?? null,
+      detalle: `El flete de la orden cancelada ya estaba registrado como gasto #${gastoExistente.id}.`,
+    }
+  }
+
+  const fecha = (orden.date_closed ?? orden.date_created).slice(0, 10)
+
+  const { error } = await supabase.from('gastos').insert({
+    categoria: 'Flete',
+    descripcion: `Flete de venta cancelada en Mercado Libre · Orden ${mlOrderId}`,
+    monto: flete,
+    fecha,
+    recurrente: false,
+    metodo_pago: 'mercadopago',
+    origen: 'ml',
+    ml_order_id: mlOrderId,
+    notas:
+      `La venta se canceló pero el envío se despachó igual, así que ML facturó el flete. ` +
+      `No tiene pedido asociado porque la venta no llegó a concretarse. ` +
+      `Operación de Mercado Libre: ${mlOrderId}.`,
+  })
+
+  if (error) {
+    if (/duplicate key|unique constraint/i.test(error.message)) {
+      return {
+        resultado: 'duplicada',
+        pedidoId: pedido?.id ?? null,
+        detalle: 'Otro proceso ya registró el flete de esta orden cancelada.',
+      }
+    }
+
+    await enviarAlerta({
+      nivel: 'atencion',
+      titulo: 'No se pudo registrar el flete de una venta cancelada de ML',
+      detalle: `La orden ${mlOrderId} se canceló con un flete de $${flete} a tu cargo, pero no se pudo cargar el gasto: ${error.message}`,
+      contexto: { ml_order_id: mlOrderId, monto: flete },
+    })
+    return { resultado: 'error', pedidoId: pedido?.id ?? null, detalle: error.message }
+  }
+
+  await enviarAlerta({
+    nivel: 'info',
+    titulo: 'Flete de venta cancelada registrado como gasto',
+    detalle: `La orden ${mlOrderId} se canceló pero el envío se despachó: se cargó un gasto de Flete por $${flete}.`,
+    contexto: { ml_order_id: mlOrderId, monto: flete },
+  })
+
+  return {
+    resultado: 'importada',
+    pedidoId: pedido?.id ?? null,
+    detalle: `Venta cancelada: se registró el flete de $${flete} como gasto.`,
+  }
+}
+
 export interface Previsualizacion {
   mlOrderId: string
   estado: string
@@ -325,6 +453,11 @@ export interface Previsualizacion {
   costoTotal: number
   /** Lo que realmente te queda: total - costoTotal. */
   neto: number
+  /**
+   * Venta cancelada cuyo envío se despachó igual: entra como gasto de Flete,
+   * no como pedido. 0 en el resto de los casos.
+   */
+  gastoFlete: number
   fecha: string
 }
 
@@ -374,6 +507,7 @@ export async function previsualizarOrden(
     impuestos: costos.impuestos,
     costoTotal: costos.total,
     neto: orden.total_amount - costos.total,
+    gastoFlete: orden.status === 'cancelled' ? costos.envio : 0,
     fecha: orden.date_closed ?? orden.date_created,
   }
 }
