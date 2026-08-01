@@ -8,7 +8,7 @@
 // token: si la orden no existe, el GET da 404 y no se crea nada.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { OrdenML } from './types'
+import type { CostosEnvioML, OrdenML } from './types'
 import {
   MLAuthError,
   MLError,
@@ -103,6 +103,38 @@ export function idDesdeResource(resource: string | undefined | null): string | n
   if (!resource) return null
   const match = /\/orders\/(\d+)/.exec(resource)
   return match ? match[1] : null
+}
+
+/**
+ * Costo de envío que absorbe el VENDEDOR, en pesos.
+ *
+ * Sale de `senders` en /shipments/{id}/costs: la entrada cuyo `user_id` es el
+ * del vendedor. El `cost` ya viene neto de los descuentos que pone ML.
+ *
+ * Devuelve 0 si el envío no le cuesta nada al vendedor (lo pagó el comprador o
+ * lo bonificó ML), que es el caso más común.
+ */
+export async function costoEnvioVendedor(
+  supabase: SupabaseClient,
+  shipmentId: number | string,
+  sellerId?: string
+): Promise<number> {
+  const costos = await getML<CostosEnvioML>(
+    supabase,
+    `/shipments/${shipmentId}/costs`,
+    sellerId
+  )
+
+  if (!costos?.senders?.length) return 0
+
+  // Normalmente hay un solo sender (el vendedor). Si viene el sellerId lo
+  // usamos para no confundirnos; si no, sumamos todos.
+  const propios = sellerId
+    ? costos.senders.filter(s => String(s.user_id) === String(sellerId))
+    : costos.senders
+
+  return (propios.length ? propios : costos.senders)
+    .reduce((total, s) => total + (s.cost ?? 0), 0)
 }
 
 export interface PaginaOrdenes {

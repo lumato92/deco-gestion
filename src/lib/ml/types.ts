@@ -45,9 +45,15 @@ export interface OrderItemML {
   unit_price: number
   full_unit_price?: number
   /**
-   * Comisión que cobra ML por este item. Ojo: se calcula al acreditarse el
-   * pago, no al crearse la orden, así que puede venir en 0 en una orden recién
-   * creada y llenarse después.
+   * Comisión de ML **POR UNIDAD**, no por línea.
+   *
+   * Verificado contra órdenes reales: dos ventas del mismo producto, una de 2
+   * unidades y otra de 4, traen exactamente el mismo sale_fee. Hay que
+   * multiplicar por `quantity` — no hacerlo subestima la comisión y infla la
+   * ganancia.
+   *
+   * Además se calcula al acreditarse el pago, no al crearse la orden, así que
+   * puede venir 0 en una orden recién creada y llenarse después.
    */
   sale_fee: number
   currency_id?: string
@@ -60,6 +66,13 @@ export interface PagoML {
   date_approved?: string | null
   payment_method_id?: string | null
   installments?: number | null
+  /** Envío cobrado dentro del pago (lo que puso el comprador). */
+  shipping_cost?: number | null
+  /** Impuestos del pago. En las ventas reales inspeccionadas viene 0. */
+  taxes_amount?: number | null
+  coupon_amount?: number | null
+  overpaid_amount?: number | null
+  total_paid_amount?: number | null
 }
 
 export interface CompradorML {
@@ -78,8 +91,36 @@ export interface OrdenML {
   total_amount: number
   currency_id?: string
   buyer?: CompradorML
+  seller?: { id: number }
   order_items: OrderItemML[]
   payments?: PagoML[]
+  /**
+   * Impuestos de la orden. En las ventas reales inspeccionadas viene
+   * `{amount: null}`, pero se lee igual por si ML empieza a informarlos.
+   */
+  taxes?: { amount: number | null; currency_id?: string | null } | null
+  shipping?: { id: number } | null
+}
+
+/** Una parte (vendedor o comprador) dentro de los costos de un envío. */
+export interface ParteEnvioML {
+  user_id: number
+  /** Lo que efectivamente paga esta parte, ya neto de descuentos. */
+  cost: number
+  save?: number
+}
+
+/**
+ * Respuesta de /shipments/{id}/costs.
+ *
+ * `senders` es donde está el costo que absorbe el VENDEDOR: en un envío gratis
+ * el comprador paga 0 y el vendedor se come el flete. Sin esto la ganancia
+ * queda inflada.
+ */
+export interface CostosEnvioML {
+  gross_amount?: number
+  senders?: ParteEnvioML[]
+  receiver?: ParteEnvioML | null
 }
 
 /** Respuesta del POST /oauth/token (authorization_code y refresh_token). */

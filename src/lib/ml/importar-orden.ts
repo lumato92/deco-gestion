@@ -7,6 +7,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { crearPedidoCompleto, type ItemPedidoNuevo } from '@/lib/pedidos/crear-pedido'
+import { costoEnvioVendedor } from './client'
 import { enviarAlerta } from './alertas'
 import type { OrdenML, ResultadoImportacion } from './types'
 
@@ -20,12 +21,70 @@ export interface ResultadoImportar {
 const ESTADOS_IMPORTABLES: ReadonlySet<string> = new Set(['paid'])
 
 /**
- * Comisión total de ML: la suma de sale_fee de cada item.
- * Ojo — ML calcula sale_fee al acreditar el pago, así que en una orden recién
- * creada puede venir 0 y completarse más tarde.
+ * Comisión total de ML.
+ *
+ * `sale_fee` es POR UNIDAD, así que va multiplicado por la cantidad. Verificado
+ * contra ventas reales: dos órdenes del mismo producto, de 2 y de 4 unidades,
+ * traen el mismo sale_fee. Sumarlo sin multiplicar subestimaba la comisión e
+ * inflaba la ganancia (en una venta de 4 unidades, por un factor de 4).
  */
 export function calcularComision(orden: OrdenML): number {
-  return orden.order_items.reduce((total, item) => total + (item.sale_fee ?? 0), 0)
+  return orden.order_items.reduce(
+    (total, item) => total + (item.sale_fee ?? 0) * (item.quantity ?? 1),
+    0
+  )
+}
+
+/** Impuestos informados por ML. Hoy vienen null en las ventas reales. */
+export function calcularImpuestos(orden: OrdenML): number {
+  const deLaOrden = orden.taxes?.amount ?? 0
+  const deLosPagos = (orden.payments ?? []).reduce(
+    (t, p) => t + (p.taxes_amount ?? 0),
+    0
+  )
+  return deLaOrden + deLosPagos
+}
+
+export interface CostosOrden {
+  comision: number
+  envio: number
+  impuestos: number
+  /** Lo que se descuenta del ingreso: comisión + envío + impuestos. */
+  total: number
+}
+
+/**
+ * Todo lo que ML se queda de una venta.
+ *
+ * El envío requiere una consulta extra a /shipments/{id}/costs. Si esa
+ * consulta falla NO se pierde la venta: se registra lo que sí sabemos y se
+ * alerta, porque una ganancia con el envío sin descontar es mejor que no
+ * tener la venta — pero hay que enterarse.
+ */
+export async function calcularCostos(
+  supabase: SupabaseClient,
+  orden: OrdenML,
+  sellerId?: string
+): Promise<CostosOrden> {
+  const comision = calcularComision(orden)
+  const impuestos = calcularImpuestos(orden)
+
+  let envio = 0
+  const shipmentId = orden.shipping?.id
+  if (shipmentId) {
+    try {
+      envio = await costoEnvioVendedor(supabase, shipmentId, sellerId ?? (orden.seller ? String(orden.seller.id) : undefined))
+    } catch (e) {
+      await enviarAlerta({
+        nivel: 'atencion',
+        titulo: 'No se pudo leer el costo de envío de una venta de ML',
+        detalle: `La orden ${orden.id} se importa sin descontar el flete, así que su ganancia va a figurar más alta de lo real. Revisala a mano.`,
+        contexto: { ml_order_id: String(orden.id), shipment_id: shipmentId, error: e instanceof Error ? e.message : String(e) },
+      })
+    }
+  }
+
+  return { comision, envio, impuestos, total: comision + envio + impuestos }
 }
 
 /** Cliente genérico: no ensuciamos la tabla de clientes con nicknames de ML. */
@@ -67,7 +126,8 @@ async function matchearProductos(
  */
 export async function importarOrden(
   supabase: SupabaseClient,
-  orden: OrdenML
+  orden: OrdenML,
+  opciones: { sellerId?: string } = {}
 ): Promise<ResultadoImportar> {
   const mlOrderId = String(orden.id)
 
@@ -132,7 +192,7 @@ export async function importarOrden(
   })
 
   const conciliado = sinMatch.length === 0
-  const comision = calcularComision(orden)
+  const costos = await calcularCostos(supabase, orden, opciones.sellerId)
   const fecha = orden.date_closed ?? orden.date_created
 
   // ── Alta del pedido ────────────────────────────────────────
@@ -153,8 +213,13 @@ export async function importarOrden(
       tipo: 'pago_total',
       metodo_pago: 'mercadopago',
       monto: orden.total_amount,
-      comisiones: comision,
-      notas: `Orden ML #${orden.id} · Comisión ML $${comision}`,
+      // Comisión + envío + impuestos van juntos: es lo que las vistas de
+      // finanzas ya restan del ingreso neto. El desglose queda en las notas.
+      comisiones: costos.total,
+      notas:
+        `Orden ML #${orden.id} · Comisión $${costos.comision}` +
+        ` · Envío $${costos.envio}` +
+        (costos.impuestos ? ` · Impuestos $${costos.impuestos}` : ''),
     },
     ml_order_id: mlOrderId,
     conciliado,
@@ -228,6 +293,12 @@ export interface Previsualizacion {
   sinMatch: string[]
   total: number
   comision: number
+  envio: number
+  impuestos: number
+  /** comisión + envío + impuestos: lo que se descuenta del ingreso. */
+  costoTotal: number
+  /** Lo que realmente te queda: total - costoTotal. */
+  neto: number
   fecha: string
 }
 
@@ -240,7 +311,8 @@ export interface Previsualizacion {
  */
 export async function previsualizarOrden(
   supabase: SupabaseClient,
-  orden: OrdenML
+  orden: OrdenML,
+  opciones: { sellerId?: string } = {}
 ): Promise<Previsualizacion> {
   const mlOrderId = String(orden.id)
 
@@ -261,6 +333,8 @@ export async function previsualizarOrden(
       .map(l => `${l.item.id} (${l.item.title})`)
   }
 
+  const costos = await calcularCostos(supabase, orden, opciones.sellerId)
+
   return {
     mlOrderId,
     estado: orden.status,
@@ -269,7 +343,11 @@ export async function previsualizarOrden(
     pedidoExistente: existente?.id ?? null,
     sinMatch,
     total: orden.total_amount,
-    comision: calcularComision(orden),
+    comision: costos.comision,
+    envio: costos.envio,
+    impuestos: costos.impuestos,
+    costoTotal: costos.total,
+    neto: orden.total_amount - costos.total,
     fecha: orden.date_closed ?? orden.date_created,
   }
 }

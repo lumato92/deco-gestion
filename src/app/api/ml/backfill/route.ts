@@ -113,6 +113,9 @@ export async function POST(req: NextRequest) {
     }
     const detalle: (Previsualizacion | { mlOrderId: string; resultado: string; pedidoId: number | null; detalle: string })[] = []
 
+    // Solo en simulación: cuánto de lo facturado se lleva ML y cuánto queda.
+    const totales = { facturado: 0, comision: 0, envio: 0, impuestos: 0, neto: 0 }
+
     for (const id of aProcesar) {
       await dormir(PAUSA_MS)
 
@@ -125,8 +128,15 @@ export async function POST(req: NextRequest) {
       }
 
       if (simulacion) {
-        const previa = await previsualizarOrden(supabase, orden)
+        const previa = await previsualizarOrden(supabase, orden, { sellerId })
         detalle.push(previa)
+        if (!previa.yaImportada && previa.importable) {
+          totales.facturado += previa.total
+          totales.comision += previa.comision
+          totales.envio += previa.envio
+          totales.impuestos += previa.impuestos
+          totales.neto += previa.neto
+        }
         if (previa.yaImportada) resumen.duplicada++
         else if (!previa.importable) resumen.ignorada++
         else if (previa.sinMatch.length > 0) resumen.sin_conciliar++
@@ -134,7 +144,7 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      const r = await importarOrden(supabase, orden)
+      const r = await importarOrden(supabase, orden, { sellerId })
       await registrarImportacion(supabase, {
         mlOrderId: id,
         resultado: r.resultado,
@@ -164,6 +174,7 @@ export async function POST(req: NextRequest) {
       total_en_ml: total,
       procesadas: aProcesar.length,
       resumen,
+      ...(simulacion ? { totales } : {}),
       detalle,
     })
   } catch (e) {
