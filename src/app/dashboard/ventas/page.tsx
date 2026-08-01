@@ -626,6 +626,8 @@ export default function VentasPage() {
           <option value="whatsapp">WhatsApp</option>
           <option value="instagram">Instagram</option>
           <option value="tienda">Tienda</option>
+          <option value="ecommerce">Ecommerce</option>
+          <option value="mercadolibre">Mercado Libre</option>
         </select>
         <button onClick={limpiarFiltros}
           className="ml-auto text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 border border-gray-200 rounded-lg bg-surface">
