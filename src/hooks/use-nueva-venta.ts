@@ -4,6 +4,7 @@
 
 import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { crearPedidoCompleto } from '@/lib/pedidos/crear-pedido'
 import type { MetodoPago, CanalVenta } from '@/lib/types'
 
 export interface ItemVenta {
@@ -125,77 +126,40 @@ export function useNuevaVenta() {
     const fechaConfirmacion = new Date(`${fechaBase}T${new Date().toTimeString().split(' ')[0]}`).toISOString()
 
     try {
-      const { data: pedido, error: errPedido } = await supabase
-        .from('pedidos')
-        .insert({
-          cliente_id: form.cliente_id,
-          origen_venta: 'directa',
-          estado: 'confirmado',
-          canal_venta: form.canal_venta,
-          metodo_pago: form.metodo_pago,
-          descuento_pct: Math.round(descuentoPct * 100) / 100,
-          recargo_pct: recargoPct,
-          notas: form.notas || null,
-          fecha_pedido: fechaConfirmacion,
-          fecha_confirmacion: fechaConfirmacion,
-          ...(form.entrega_inmediata ? { fecha_entrega: fechaConfirmacion } : {}),
-        })
-        .select('id')
-        .single()
-
-      if (errPedido || !pedido) throw new Error(errPedido?.message ?? 'Error al crear el pedido')
-
-      const { error: errItems } = await supabase
-        .from('items_pedido')
-        .insert(
-          form.items.map(item => ({
-            pedido_id: pedido.id,
-            producto_id: item.producto_id,
-            nombre_producto: item.nombre_producto,
-            cantidad: item.cantidad,
-            precio_unitario: item.precio_unitario,
-            costo_unitario: item.costo_unitario,
-            requiere_fabricacion: item.requiere_fabricacion,
-          }))
-        )
-
-      if (errItems) throw new Error(errItems.message)
-
       // Si viene desde Point NO registramos el pago acá —
       // lo registra la route /api/pagos/point/asignar para evitar duplicado
-      if (form.metodo_pago !== 'mercadopago' && !form.desde_point) {
-        const { error: errPago } = await supabase
-          .from('pagos_pedido')
-          .insert({
-            pedido_id: pedido.id,
-            tipo: form.con_sena ? 'seña' : 'pago_total',
-            metodo_pago: form.metodo_pago,
-            monto: form.con_sena ? form.monto_sena : total,
-          })
-        if (errPago) throw new Error(errPago.message)
+      const registrarPago = form.metodo_pago !== 'mercadopago' && !form.desde_point
+
+      const resultado = await crearPedidoCompleto(supabase, {
+        cliente_id: form.cliente_id,
+        origen_venta: 'directa',
+        canal_venta: form.canal_venta,
+        metodo_pago: form.metodo_pago,
+        descuento_pct: descuentoPct,
+        recargo_pct: recargoPct,
+        notas: form.notas,
+        fecha: fechaConfirmacion,
+        entrega_inmediata: form.entrega_inmediata,
+        items: form.items,
+        pago: registrarPago
+          ? {
+              tipo: form.con_sena ? 'seña' : 'pago_total',
+              metodo_pago: form.metodo_pago,
+              monto: form.con_sena ? form.monto_sena : total,
+            }
+          : null,
+      })
+
+      if (!resultado.ok) {
+        setError(resultado.error)
+        // Con stock insuficiente el pedido igual quedó creado: devolvemos el id
+        // para que la UI navegue al pedido, con el error visible.
+        return resultado.stockInsuficiente ? resultado.pedidoId : false
       }
 
-      const { data: resultado, error: errRpc } = await supabase
-        .rpc('descontar_stock_pedido', { p_pedido_id: pedido.id })
-
-      if (errRpc) throw new Error(errRpc.message)
-
-      if (resultado && !resultado.ok) {
-        setError(`Stock insuficiente: ${JSON.stringify(resultado.errores)}`)
-        return pedido.id
-      }
-
-      if (form.entrega_inmediata) {
-        const { error: errEntrega } = await supabase
-          .from('pedidos')
-          .update({ estado: 'entregado' })
-          .eq('id', pedido.id)
-        if (errEntrega) throw new Error(errEntrega.message)
-      }
-
-      return pedido.id
-    } catch (e: any) {
-      setError(e.message ?? 'Error al confirmar la venta')
+      return resultado.pedidoId
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al confirmar la venta')
       return false
     } finally {
       setGuardando(false)
