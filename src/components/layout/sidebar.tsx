@@ -9,7 +9,7 @@ import {
   LayoutDashboard, ShoppingCart, ListOrdered, FileText,
   Package, Boxes, ShoppingBag, Truck, ClipboardList,
   Users, TrendingUp, Receipt, Factory, UserCog,
-  Moon, Sun, LogOut, Menu, X, type LucideIcon,
+  Moon, Sun, LogOut, Menu, X, Store, type LucideIcon,
 } from 'lucide-react'
 
 function cn(...classes: (string | boolean | undefined)[]) {
@@ -119,6 +119,13 @@ export default function Sidebar() {
         { href: '/dashboard/finanzas',    label: 'Finanzas',     show: esAdmin, icon: TrendingUp },
         { href: '/dashboard/gastos',      label: 'Gastos',       show: esAdmin, icon: Receipt },
         { href: '/dashboard/proveedores', label: 'Proveedores',  show: esAdmin, icon: Factory },
+      ],
+    },
+    {
+      section: 'Integraciones',
+      show: esAdmin,
+      items: [
+        { href: '/dashboard/integraciones/mercadolibre', label: 'Mercado Libre', show: esAdmin, icon: Store },
       ],
     },
     ...(usuario?.rol === 'root' ? [{
