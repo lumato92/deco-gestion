@@ -828,7 +828,17 @@ export default function VentasPage() {
                         <td className="px-4 py-2.5 font-medium text-gray-900">
                           {v.cliente_nombre ?? <span className="text-gray-400 font-normal">(sin cliente)</span>}
                         </td>
-                        <td className="px-4 py-2.5 text-gray-500 capitalize">{v.canal_venta ?? '—'}</td>
+                        <td className="px-4 py-2.5 text-gray-500 capitalize">
+                          <div className="flex items-center gap-1.5">
+                            {v.canal_venta === 'mercadolibre' ? 'Mercado Libre' : (v.canal_venta ?? '—')}
+                            {esML && v.conciliado === false && (
+                              <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full font-medium normal-case"
+                                title="La publicación de ML no matcheó ningún producto: no se descontó stock">
+                                sin conciliar
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5">
                             {mp ? <Badge text={mp.label} cls={mp.cls} /> : <span className="text-gray-300">—</span>}
