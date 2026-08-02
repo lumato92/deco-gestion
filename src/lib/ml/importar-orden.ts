@@ -400,7 +400,8 @@ async function manejarCancelada(
     // ML descuenta el flete de lo que acredita: se registra como transferencia.
     // ('mercadopago' no está en el CHECK de metodo_pago de gastos.)
     metodo_pago: 'transferencia',
-    origen: 'ml',
+    // No se manda `origen`: su CHECK no acepta 'ml' y la columna tiene default.
+    // La procedencia ya queda trazada por ml_order_id, la descripción y notas.
     ml_order_id: mlOrderId,
     notas:
       `La venta se canceló pero el envío se despachó igual, así que ML facturó el flete. ` +
