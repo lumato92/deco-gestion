@@ -243,9 +243,11 @@ export async function importarOrden(
       tipo: 'pago_total',
       metodo_pago: 'mercadopago',
       monto: orden.total_amount,
-      // Comisión + envío + impuestos van juntos: es lo que las vistas de
-      // finanzas ya restan del ingreso neto. El desglose queda en las notas.
-      comisiones: costos.total,
+      // Cada concepto en su columna: las vistas suman los tres en `deducciones`
+      // y el panel de comisiones los muestra desglosados.
+      comisiones: costos.comision,
+      costo_envio: costos.envio,
+      impuestos: costos.impuestos,
       notas:
         `Orden ML #${orden.id} · Comisión $${costos.comision}` +
         ` · Envío $${costos.envio}` +

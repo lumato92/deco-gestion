@@ -27,8 +27,12 @@ export interface PagoInicial {
   tipo: 'seña' | 'adelanto' | 'saldo' | 'pago_total'
   metodo_pago: MetodoPago
   monto: number
-  /** Lo que retuvo la plataforma (MP o ML). Las vistas lo restan del ingreso neto. */
+  /** Comisión de la plataforma (MP o ML). Solo comisión. */
   comisiones?: number
+  /** Flete a cargo del vendedor, neto de bonificaciones. */
+  costo_envio?: number
+  /** Impuestos retenidos por la plataforma. */
+  impuestos?: number
   notas?: string
 }
 
@@ -134,6 +138,8 @@ export async function crearPedidoCompleto(
         metodo_pago: input.pago.metodo_pago,
         monto: input.pago.monto,
         ...(input.pago.comisiones !== undefined ? { comisiones: input.pago.comisiones } : {}),
+        ...(input.pago.costo_envio !== undefined ? { costo_envio: input.pago.costo_envio } : {}),
+        ...(input.pago.impuestos !== undefined ? { impuestos: input.pago.impuestos } : {}),
         ...(input.pago.notas !== undefined ? { notas: input.pago.notas } : {}),
       })
 

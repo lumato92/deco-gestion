@@ -92,6 +92,10 @@ export interface ResumenMesActual {
   margen_neto_pct: number
   ticket_promedio: number
   comisiones_mp: number
+  /** Flete a cargo del vendedor (hoy solo lo genera Mercado Libre). */
+  costo_envio: number
+  /** comisiones + envíos + impuestos: todo lo que se llevan las plataformas. */
+  deducciones: number
 }
 
 export interface MesOpcion {
@@ -125,9 +129,13 @@ function calcResumen(pedidos: PedidoRaw[], gastos: GastoRaw[], ym: string): Resu
   const pedidosMes = pedidos.filter(p => p.fecha_confirmacion?.startsWith(ym))
   const gastosMes = gastos.filter(g => g.fecha?.startsWith(ym))
 
+  // `deducciones` = comisión + envío + impuestos. Se usa esa en vez de
+  // comisiones_mp para no dejar afuera el flete que absorbe el vendedor.
   const comisiones = pedidosMes.reduce((s, p) => s + (p.comisiones_mp ?? 0), 0)
-  const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.comisiones_mp ?? 0), 0)
-  const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.comisiones_mp ?? 0), 0)
+  const envios = pedidosMes.reduce((s, p) => s + (p.costo_envio ?? 0), 0)
+  const deducciones = pedidosMes.reduce((s, p) => s + (p.deducciones ?? p.comisiones_mp ?? 0), 0)
+  const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.deducciones ?? p.comisiones_mp ?? 0), 0)
+  const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.deducciones ?? p.comisiones_mp ?? 0), 0)
   const totalGastos = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
   const resultado = ganancia - totalGastos
   const cant = pedidosMes.length
@@ -142,6 +150,8 @@ function calcResumen(pedidos: PedidoRaw[], gastos: GastoRaw[], ym: string): Resu
     margen_neto_pct: ingresos > 0 ? Math.round(resultado / ingresos * 100) : 0,
     ticket_promedio: cant > 0 ? Math.round(ingresos / cant) : 0,
     comisiones_mp: comisiones,
+    costo_envio: envios,
+    deducciones,
   }
 }
 
@@ -151,6 +161,9 @@ interface PedidoRaw {
   total_cobrado: number | null
   ganancia: number | null
   comisiones_mp: number | null
+  costo_envio: number | null
+  impuestos: number | null
+  deducciones: number | null
   cant_items: number | null
   cliente_nombre: string | null
   canal_venta: string | null
@@ -197,7 +210,7 @@ export function useFinanzas() {
       const [pedidosRes, gastosRes, pagosRes, itemsRes, cobrarRes, prodRes] = await Promise.all([
         supabase
           .from('pedidos_con_total')
-          .select('id, fecha_confirmacion, total_cobrado, ganancia, comisiones_mp, cant_items, cliente_nombre, canal_venta, estado')
+          .select('id, fecha_confirmacion, total_cobrado, ganancia, comisiones_mp, costo_envio, impuestos, deducciones, cant_items, cliente_nombre, canal_venta, estado')
           .in('estado', ESTADOS_VENTA)
           .gte('fecha_confirmacion', `${desde}`)
           .order('fecha_confirmacion'),
@@ -306,9 +319,10 @@ export function useFinanzas() {
       const pedidosMes = raw.pedidos.filter(p => p.fecha_confirmacion?.startsWith(mes))
       const gastosMes = raw.gastos.filter(g => g.fecha?.startsWith(mes))
 
-      // Ingreso y ganancia netos de comisiones de MP
-      const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.comisiones_mp ?? 0), 0)
-      const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.comisiones_mp ?? 0), 0)
+      // Ingreso y ganancia netos de todo lo que retiene la plataforma
+      // (comisión + envío + impuestos), no solo de la comisión.
+      const ingresos = pedidosMes.reduce((s, p) => s + (p.total_cobrado ?? 0) - (p.deducciones ?? p.comisiones_mp ?? 0), 0)
+      const ganancia = pedidosMes.reduce((s, p) => s + (p.ganancia ?? 0) - (p.deducciones ?? p.comisiones_mp ?? 0), 0)
       const totalGastos = gastosMes.reduce((s, g) => s + (g.monto ?? 0), 0)
 
       return {

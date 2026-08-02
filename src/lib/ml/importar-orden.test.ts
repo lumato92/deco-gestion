@@ -349,8 +349,10 @@ describe('mapeo orden → pedido', () => {
     await importarOrden(supabase, orden({ shipping: { id: 47577813594 } }), { sellerId: '99212759' })
 
     const pago = inserts.find(i => i.tabla === 'pagos_pedido')?.payload as Record<string, unknown>
-    // (7800 × 2 unidades) de comisión + 9860 de flete
-    expect(pago.comisiones).toBe(25460)
+    // Cada concepto en su columna: las vistas los suman en `deducciones`.
+    expect(pago.comisiones).toBe(15600) // sale_fee 7800 × 2 unidades
+    expect(pago.costo_envio).toBe(9860)
+    expect(pago.impuestos).toBe(0)
     expect(pago.notas).toContain('Envío $9860')
   })
 

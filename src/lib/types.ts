@@ -91,6 +91,15 @@ export interface PedidoConTotal {
   cobrado: number
   pendiente: number
   mp_link?: string
+  /** Comisión de la plataforma (MP o ML). */
+  comisiones_mp?: number
+  /** Flete a cargo del vendedor. */
+  costo_envio?: number
+  impuestos?: number
+  /** comisiones_mp + costo_envio + impuestos: todo lo que se lleva la plataforma. */
+  deducciones?: number
+  /** total_cobrado − deducciones: lo que realmente entra. */
+  neto?: number
 }
 
 export interface ItemPedido {
