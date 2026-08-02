@@ -397,7 +397,9 @@ async function manejarCancelada(
     monto: flete,
     fecha,
     recurrente: false,
-    metodo_pago: 'mercadopago',
+    // ML descuenta el flete de lo que acredita: se registra como transferencia.
+    // ('mercadopago' no está en el CHECK de metodo_pago de gastos.)
+    metodo_pago: 'transferencia',
     origen: 'ml',
     ml_order_id: mlOrderId,
     notas:
