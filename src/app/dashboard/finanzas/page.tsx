@@ -208,9 +208,12 @@ export default function FinanzasPage() {
         <MetricaCard label="Ticket promedio" valor={mesActual.ticket_promedio}
           sub="ingreso por venta" loading={loading}
           delta={delta(mesActual.ticket_promedio, mesAnterior.ticket_promedio)} />
-        <MetricaCard label="Comisiones MP" valor={mesActual.comisiones_mp}
-          sub="retenido por Mercado Pago" loading={loading}
+        <MetricaCard label="Comisiones" valor={mesActual.comisiones_mp}
+          sub="retenido por MP y ML" loading={loading}
           delta={delta(mesActual.comisiones_mp, mesAnterior.comisiones_mp)} deltaInverso />
+        <MetricaCard label="Envíos a tu cargo" valor={mesActual.costo_envio}
+          sub="flete que absorbe el vendedor" loading={loading}
+          delta={delta(mesActual.costo_envio, mesAnterior.costo_envio)} deltaInverso />
       </div>
 
       {/* Gráfico histórico — área */}

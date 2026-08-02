@@ -76,6 +76,111 @@ interface PagoPointAsignado {
   fecha_pago: string
 }
 
+/**
+ * Desglose de una venta de Mercado Libre.
+ *
+ * Mismo lenguaje visual que el panel de Point, pero con tres deducciones en
+ * vez de una. No necesita consultar nada: la vista pedidos_con_total ya trae
+ * el desglose y el neto.
+ */
+function PanelComisionesML({ venta, onCerrar }: {
+  venta: PedidoConTotal
+  onCerrar: () => void
+}) {
+  const bruto = venta.total_cobrado
+  const comision = venta.comisiones_mp ?? 0
+  const envio = venta.costo_envio ?? 0
+  const impuestos = venta.impuestos ?? 0
+  const neto = venta.neto ?? (bruto - comision - envio - impuestos)
+  const pct = (n: number) => bruto > 0 ? ((n / bruto) * 100).toFixed(1) : '0'
+
+  return (
+    <tr>
+      <td colSpan={9} className="p-0">
+        <div className="bg-gray-50 border-t border-gray-200 px-6 py-3">
+          <div className="flex items-start gap-8 flex-wrap">
+
+            {/* Desglose */}
+            <div className="flex flex-col gap-1.5 min-w-[240px]">
+              <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">
+                Desglose venta Mercado Libre
+              </div>
+              <div className="flex justify-between text-[12px]">
+                <span className="text-gray-500">Monto cobrado</span>
+                <span className="font-medium text-gray-900">{formatMonto(bruto)}</span>
+              </div>
+              <div className="flex justify-between text-[12px]">
+                <span className="text-gray-500">Comisión ML ({pct(comision)}%)</span>
+                <span className="text-red-600">— {formatMonto(comision)}</span>
+              </div>
+              <div className="flex justify-between text-[12px]">
+                <span className="text-gray-500">Envío a tu cargo</span>
+                <span className={envio > 0 ? 'text-red-600' : 'text-gray-400'}>
+                  {envio > 0 ? `— ${formatMonto(envio)}` : '—'}
+                </span>
+              </div>
+              {impuestos > 0 && (
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-gray-500">Impuestos</span>
+                  <span className="text-red-600">— {formatMonto(impuestos)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-[12px] pt-1.5 border-t border-gray-200">
+                <span className="font-medium text-gray-700">Neto acreditado</span>
+                <span className="font-medium text-teal-700">{formatMonto(neto)}</span>
+              </div>
+            </div>
+
+            {/* Detalle */}
+            <div className="flex flex-col gap-1.5">
+              <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">
+                Detalle
+              </div>
+              <div className="text-[12px] text-gray-700">
+                {venta.conciliado === false ? 'Sin conciliar' : 'Conciliada'}
+              </div>
+              <div className="text-[12px] text-gray-500">
+                {venta.fecha_confirmacion ? formatFecha(venta.fecha_confirmacion) : formatFecha(venta.fecha_pedido)}
+              </div>
+              <div className="text-[11px] text-gray-400 mt-0.5">
+                Orden ML #{venta.ml_order_id ?? '—'}
+              </div>
+            </div>
+
+            {/* Impacto neto */}
+            <div className="flex flex-col gap-1.5">
+              <div className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">
+                Impacto neto
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-teal-500 rounded-full"
+                    style={{ width: `${bruto > 0 ? (neto / bruto) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-[12px] text-teal-700 font-medium">
+                  {pct(neto)}% neto
+                </span>
+              </div>
+              <div className="text-[11px] text-gray-400">
+                Perdés {formatMonto(comision + envio + impuestos)} entre comisión y envío
+              </div>
+            </div>
+
+            <button
+              onClick={onCerrar}
+              className="ml-auto self-start text-[11px] text-gray-400 hover:text-gray-600 px-2 py-1 border border-gray-200 rounded-lg"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 function PanelComisionesPoint({ pedidoId, onCerrar }: {
   pedidoId: number
   onCerrar: () => void
@@ -494,7 +599,7 @@ function ModalReenviarLink({ venta, onCerrar }: { venta: PedidoConTotal; onCerra
 
 export default function VentasPage() {
   const {
-    ventas, resumenMetodos, totalPeriodo, totalCobrado, totalPendiente,
+    ventas, resumenMetodos, totalPeriodo, totalNeto, totalDeducciones, totalCobrado, totalPendiente,
     loading, error, filtros, setFiltros, limpiarFiltros, recargar,
   } = useVentas()
 
@@ -567,9 +672,12 @@ export default function VentasPage() {
       </div>
 
       {/* Métricas */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: 'Total del período', valor: totalPeriodo,   sub: `${ventas.length} ventas` },
+          // Bruto y neto conviven a propósito: el bruto es lo que facturaste,
+          // el neto lo que queda después de comisiones, envíos e impuestos.
+          { label: 'Neto',              valor: totalNeto,      sub: totalDeducciones > 0 ? `— ${formatMonto(totalDeducciones)} de comisiones y envíos` : 'sin deducciones' },
           { label: 'Cobrado',           valor: totalCobrado,   sub: totalPeriodo > 0 ? `${Math.round(totalCobrado / totalPeriodo * 100)}% del total` : '—' },
           { label: 'Por cobrar',        valor: totalPendiente, sub: `${ventas.filter(v => v.pendiente > 0).length} ventas con saldo` },
           { label: 'Ticket promedio',   valor: ventas.length > 0 ? Math.round(totalPeriodo / ventas.length) : 0, sub: 'este período' },
@@ -708,6 +816,7 @@ export default function VentasPage() {
                     const mp = v.metodo_pago ? MP_CFG[v.metodo_pago] : null
                     const esMPPendiente = v.metodo_pago === 'mercadopago' && v.pendiente > 0
                     const tienePoint = ventasConPoint.has(v.id)
+                    const esML = v.canal_venta === 'mercadolibre'
                     const panelAbierto = panelComisiones === v.id
 
                     return [
@@ -748,7 +857,7 @@ export default function VentasPage() {
                         </td>
                         <td className="px-4 py-2.5">
                           <div className="flex gap-1 justify-end">
-                            {tienePoint && (
+                            {(tienePoint || esML) && (
                               <button
                                 onClick={() => setPanelComisiones(prev => prev === v.id ? null : v.id)}
                                 className={`text-[11px] px-2.5 py-1 rounded-lg font-medium border transition-colors ${
@@ -796,11 +905,19 @@ export default function VentasPage() {
                         </td>
                       </tr>,
                       panelAbierto && (
-                        <PanelComisionesPoint
-                          key={`comisiones-${v.id}`}
-                          pedidoId={v.id}
-                          onCerrar={() => setPanelComisiones(null)}
-                        />
+                        esML ? (
+                          <PanelComisionesML
+                            key={`comisiones-${v.id}`}
+                            venta={v}
+                            onCerrar={() => setPanelComisiones(null)}
+                          />
+                        ) : (
+                          <PanelComisionesPoint
+                            key={`comisiones-${v.id}`}
+                            pedidoId={v.id}
+                            onCerrar={() => setPanelComisiones(null)}
+                          />
+                        )
                       )
                     ].filter(Boolean)
                   })

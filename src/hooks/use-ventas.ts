@@ -36,6 +36,10 @@
     ventas: PedidoConTotal[]
     resumenMetodos: ResumenMetodos
     totalPeriodo: number
+    /** Total facturado menos comisiones, envíos e impuestos. */
+    totalNeto: number
+    /** Lo que se llevaron las plataformas en el período. */
+    totalDeducciones: number
     totalCobrado: number
     totalPendiente: number
     loading: boolean
@@ -118,6 +122,9 @@
     // Resumen por método — solo ventas activas (no canceladas)
     const ventasActivas = ventas.filter(v => v.estado !== 'cancelado')
 
+    // Los totales por método son plata que entró por caja/banco, así que van
+    // en BRUTO: es lo que el cliente pagó, no lo que quedó después de que la
+    // plataforma se cobre lo suyo.
     const resumenMetodos: ResumenMetodos = {
       efectivo:      ventasActivas.filter(v => v.metodo_pago === 'efectivo').reduce((s, v) => s + v.total_cobrado, 0),
       transferencia: ventasActivas.filter(v => v.metodo_pago === 'transferencia').reduce((s, v) => s + v.total_cobrado, 0),
@@ -125,11 +132,21 @@
       credito:       ventasActivas.filter(v => v.metodo_pago === 'credito').reduce((s, v) => s + v.total_cobrado, 0),
     }
 
+    // Total facturado vs. lo que queda después de comisiones, envíos e impuestos.
+    const totalBruto = ventasActivas.reduce((s, v) => s + v.total_cobrado, 0)
+    const totalNeto = ventasActivas.reduce(
+      (s, v) => s + (v.neto ?? v.total_cobrado - (v.deducciones ?? v.comisiones_mp ?? 0)),
+      0
+    )
+    const totalDeducciones = totalBruto - totalNeto
+
     return {
       ventas,
       resumenMetodos,
       // Totales calculados solo sobre ventas activas
-      totalPeriodo:   ventasActivas.reduce((s, v) => s + v.total_cobrado, 0),
+      totalPeriodo:   totalBruto,
+      totalNeto,
+      totalDeducciones,
       totalCobrado:   ventasActivas.reduce((s, v) => s + v.cobrado, 0),
       totalPendiente: ventasActivas.reduce((s, v) => s + v.pendiente, 0),
       loading,
