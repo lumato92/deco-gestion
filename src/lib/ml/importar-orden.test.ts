@@ -235,19 +235,20 @@ describe('ventas canceladas', () => {
     const r = await importarOrden(supabase, cancelada(), { sellerId: '99212759' })
 
     expect(r.resultado).toBe('importada')
-    const gasto = inserts.find(i => i.tabla === 'gastos')?.payload
+    const gasto = inserts.find(i => i.tabla === 'gastos')?.payload as Record<string, unknown>
     expect(gasto).toMatchObject({
       categoria: 'Flete',
       monto: 7618,
       ml_order_id: '2000012345678',
-      origen: 'ml',
       // 'mercadopago' no está en el CHECK de gastos.metodo_pago: usar uno válido.
       metodo_pago: 'transferencia',
       fecha: '2026-07-20', // fecha de la orden, no de hoy
     })
+    // No se manda `origen`: su CHECK no acepta 'ml'. La columna usa su default.
+    expect(gasto).not.toHaveProperty('origen')
     // Tiene que quedar claro qué es y de qué operación viene.
-    expect(gasto?.descripcion).toContain('cancelada')
-    expect(gasto?.descripcion).toContain('2000012345678')
+    expect((gasto.descripcion as string)).toContain('cancelada')
+    expect((gasto.descripcion as string)).toContain('2000012345678')
   })
 
   it('no crea ningún pedido por una venta cancelada', async () => {
