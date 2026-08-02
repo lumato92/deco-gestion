@@ -241,6 +241,8 @@ describe('ventas canceladas', () => {
       monto: 7618,
       ml_order_id: '2000012345678',
       origen: 'ml',
+      // 'mercadopago' no está en el CHECK de gastos.metodo_pago: usar uno válido.
+      metodo_pago: 'transferencia',
       fecha: '2026-07-20', // fecha de la orden, no de hoy
     })
     // Tiene que quedar claro qué es y de qué operación viene.
