@@ -1,12 +1,17 @@
 // src/lib/ml/conciliar.ts
 //
-// Conciliación de stock de ventas de ML que entraron sin producto asociado.
+// Conciliación de stock de ventas de ML que entraron sin descontarlo.
 //
-// Mientras una publicación no está vinculada (ml_publicaciones), sus ventas
-// entran con producto_id = null y no descuentan stock. Cuando se vincula, esas
-// ventas viejas quedan pendientes: acá se buscan, se simula cuánto baja cada
-// stock y, confirmado, se descuenta línea por línea con el RPC
-// conciliar_item_ml (idempotente: nunca descuenta dos veces la misma línea).
+// Dos casos:
+//   · sin_vincular: la publicación no estaba vinculada a un producto, así que
+//     la línea entró con producto_id = null.
+//   · stock_insuficiente: descontar_stock_pedido es todo o nada; si a una
+//     línea le faltaba stock no descontó ninguna. Se reconoce porque el pedido
+//     no tiene su movimiento 'venta'.
+//
+// Acá se buscan, se simula cuánto baja cada stock (kits → sus componentes) y,
+// confirmado, se descuenta línea por línea con el RPC conciliar_item_ml, que
+// es idempotente: nunca descuenta dos veces la misma línea.
 //
 // Si no alcanza el stock se descuenta igual y queda negativo: la venta ya
 // ocurrió en ML (decisión de negocio).
@@ -15,12 +20,24 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchOrden } from './client'
 import { enviarAlerta } from './alertas'
 
+export interface ComponenteKit {
+  id: number
+  nombre: string
+  stock: number
+  /** Unidades del componente por unidad de kit. */
+  cantidad: number
+}
+
 export interface ProductoConciliable {
   id: number
   nombre: string
   stock: number
   es_kit: boolean
+  /** Solo en kits: lo que realmente se descuenta. */
+  componentes?: ComponenteKit[]
 }
+
+export type MotivoPendiente = 'sin_vincular' | 'stock_insuficiente'
 
 export interface LineaPendiente {
   itemId: number
@@ -31,18 +48,24 @@ export interface LineaPendiente {
   mlItemId: string | null
   titulo: string
   cantidad: number
-  /** Producto vinculado a la publicación, o null si todavía no se vinculó. */
+  motivo: MotivoPendiente
+  /** Producto a descontar, o null si la publicación todavía no se vinculó. */
   producto: ProductoConciliable | null
 }
 
 interface FilaItem {
   id: number
   pedido_id: number
+  producto_id: number | null
   ml_item_id: string | null
   nombre_producto: string
   cantidad: number
-  pedidos: { ml_order_id: string | null; fecha_pedido: string; estado: string }
+  pedidos: { ml_order_id: string | null; fecha_pedido: string }
 }
+
+const SELECT_ITEM =
+  'id, pedido_id, producto_id, ml_item_id, nombre_producto, cantidad, ' +
+  'pedidos!inner(ml_order_id, fecha_pedido, estado, canal_venta)'
 
 /**
  * Completa ml_item_id de las líneas que no lo tienen, releyendo la orden en ML.
@@ -79,9 +102,91 @@ async function completarOrigen(
   }
 }
 
+/** Líneas con producto de pedidos cuyo descuento de stock nunca se hizo. */
+async function lineasSinDescuento(
+  supabase: SupabaseClient,
+  mlItemId?: string
+): Promise<FilaItem[]> {
+  let consulta = supabase
+    .from('items_pedido')
+    .select(SELECT_ITEM)
+    .not('producto_id', 'is', null)
+    .is('stock_conciliado_at', null)
+    .eq('pedidos.canal_venta', 'mercadolibre')
+    .neq('pedidos.estado', 'cancelado')
+
+  if (mlItemId) consulta = consulta.eq('ml_item_id', mlItemId)
+
+  const { data, error } = await consulta
+  if (error) throw new Error(`Error buscando ventas sin descontar: ${error.message}`)
+
+  const filas = (data ?? []) as unknown as FilaItem[]
+  const idsPedidos = [...new Set(filas.map(f => f.pedido_id))]
+  if (!idsPedidos.length) return []
+
+  // descontar_stock_pedido inserta el movimiento 'venta' solo si descontó.
+  const { data: movs, error: errMov } = await supabase
+    .from('movimientos')
+    .select('referencia_id')
+    .eq('tipo', 'venta')
+    .eq('referencia_tipo', 'pedido')
+    .in('referencia_id', idsPedidos)
+
+  if (errMov) throw new Error(`Error buscando movimientos: ${errMov.message}`)
+
+  const descontados = new Set((movs ?? []).map(m => Number(m.referencia_id)))
+  return filas.filter(f => !descontados.has(f.pedido_id))
+}
+
+/** Productos por id, con los componentes de los kits. */
+async function cargarProductos(
+  supabase: SupabaseClient,
+  ids: number[]
+): Promise<Map<number, ProductoConciliable>> {
+  const mapa = new Map<number, ProductoConciliable>()
+  if (!ids.length) return mapa
+
+  const { data: productos, error } = await supabase
+    .from('productos')
+    .select('id, nombre, stock, es_kit')
+    .in('id', ids)
+  if (error) throw new Error(`Error buscando productos: ${error.message}`)
+
+  for (const p of (productos ?? []) as ProductoConciliable[]) mapa.set(p.id, { ...p })
+
+  const kits = [...mapa.values()].filter(p => p.es_kit).map(p => p.id)
+  if (!kits.length) return mapa
+
+  const { data: comps, error: errComp } = await supabase
+    .from('componentes_kit')
+    .select('kit_id, producto_id, cantidad')
+    .in('kit_id', kits)
+  if (errComp) throw new Error(`Error buscando componentes de kits: ${errComp.message}`)
+
+  const filasComp = (comps ?? []) as { kit_id: number; producto_id: number; cantidad: number }[]
+  const idsComp = [...new Set(filasComp.map(c => c.producto_id))]
+
+  const { data: prodComp, error: errProdComp } = await supabase
+    .from('productos')
+    .select('id, nombre, stock')
+    .in('id', idsComp.length ? idsComp : [-1])
+  if (errProdComp) throw new Error(`Error buscando componentes: ${errProdComp.message}`)
+
+  const infoComp = new Map((prodComp ?? []).map(p => [p.id as number, p as { id: number; nombre: string; stock: number }]))
+
+  for (const c of filasComp) {
+    const kit = mapa.get(c.kit_id)
+    const info = infoComp.get(c.producto_id)
+    if (!kit || !info) continue
+    kit.componentes = [...(kit.componentes ?? []), { ...info, cantidad: c.cantidad }]
+  }
+
+  return mapa
+}
+
 /**
- * Líneas de ventas ML sin producto, con el producto al que apuntaría su
- * publicación si ya está vinculada. Excluye pedidos cancelados.
+ * Líneas de ventas ML no canceladas que todavía no descontaron stock, con el
+ * producto a descontar (el vinculado a su publicación, o el que ya tenían).
  */
 export async function buscarPendientes(
   supabase: SupabaseClient,
@@ -89,7 +194,7 @@ export async function buscarPendientes(
 ): Promise<LineaPendiente[]> {
   let consulta = supabase
     .from('items_pedido')
-    .select('id, pedido_id, ml_item_id, nombre_producto, cantidad, pedidos!inner(ml_order_id, fecha_pedido, estado, canal_venta)')
+    .select(SELECT_ITEM)
     .is('producto_id', null)
     .eq('pedidos.canal_venta', 'mercadolibre')
     .neq('pedidos.estado', 'cancelado')
@@ -99,51 +204,61 @@ export async function buscarPendientes(
   const { data, error } = await consulta
   if (error) throw new Error(`Error buscando ventas pendientes: ${error.message}`)
 
-  const filas = (data ?? []) as unknown as FilaItem[]
-  if (!opciones.mlItemId) await completarOrigen(supabase, filas, opciones.sellerId)
+  const sinProducto = (data ?? []) as unknown as FilaItem[]
+  if (!opciones.mlItemId) await completarOrigen(supabase, sinProducto, opciones.sellerId)
 
-  const idsPublicaciones = [...new Set(filas.map(f => f.ml_item_id).filter((x): x is string => Boolean(x)))]
-  const productoDe = new Map<string, ProductoConciliable>()
+  const sinDescuento = await lineasSinDescuento(supabase, opciones.mlItemId)
+
+  // Publicación → producto, para las líneas sin producto.
+  const idsPublicaciones = [...new Set(sinProducto.map(f => f.ml_item_id).filter((x): x is string => Boolean(x)))]
+  const vinculoDe = new Map<string, number>()
 
   if (idsPublicaciones.length) {
     const { data: vinculos, error: errV } = await supabase
       .from('ml_publicaciones')
-      .select('ml_item_id, productos(id, nombre, stock, es_kit)')
+      .select('ml_item_id, producto_id')
       .in('ml_item_id', idsPublicaciones)
 
     if (errV) throw new Error(`Error buscando vínculos: ${errV.message}`)
-
-    for (const v of (vinculos ?? []) as unknown as { ml_item_id: string; productos: ProductoConciliable | null }[]) {
-      if (v.productos) productoDe.set(v.ml_item_id, v.productos)
-    }
+    for (const v of vinculos ?? []) vinculoDe.set(v.ml_item_id, v.producto_id)
   }
 
-  return filas
-    .map(f => ({
-      itemId: f.id,
-      pedidoId: f.pedido_id,
-      mlOrderId: f.pedidos.ml_order_id ?? '',
-      fecha: f.pedidos.fecha_pedido,
-      mlItemId: f.ml_item_id,
-      titulo: f.nombre_producto,
-      cantidad: f.cantidad,
-      producto: f.ml_item_id ? productoDe.get(f.ml_item_id) ?? null : null,
-    }))
-    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const idsProductos = [
+    ...vinculoDe.values(),
+    ...sinDescuento.map(f => f.producto_id!),
+  ]
+  const productos = await cargarProductos(supabase, [...new Set(idsProductos)])
+
+  const aLinea = (f: FilaItem, motivo: MotivoPendiente, productoId: number | undefined): LineaPendiente => ({
+    itemId: f.id,
+    pedidoId: f.pedido_id,
+    mlOrderId: f.pedidos.ml_order_id ?? '',
+    fecha: f.pedidos.fecha_pedido,
+    mlItemId: f.ml_item_id,
+    titulo: f.nombre_producto,
+    cantidad: f.cantidad,
+    motivo,
+    producto: productoId != null ? productos.get(productoId) ?? null : null,
+  })
+
+  return [
+    ...sinProducto.map(f => aLinea(f, 'sin_vincular', f.ml_item_id ? vinculoDe.get(f.ml_item_id) : undefined)),
+    ...sinDescuento.map(f => aLinea(f, 'stock_insuficiente', f.producto_id!)),
+  ].sort((a, b) => a.fecha.localeCompare(b.fecha))
 }
 
 export interface ImpactoProducto {
   productoId: number
   nombre: string
-  esKit: boolean
   stockActual: number
   aDescontar: number
   stockResultante: number
-  lineas: number
+  /** Nombres de los kits vendidos que descuentan de este producto. */
+  viaKits: string[]
 }
 
 export interface Simulacion {
-  /** Lo que se va a descontar, agrupado por producto. */
+  /** Lo que se va a descontar, agrupado por producto que efectivamente baja. */
   productos: ImpactoProducto[]
   /** Líneas que se pueden conciliar ya. */
   conciliables: LineaPendiente[]
@@ -157,6 +272,21 @@ export function simular(pendientes: LineaPendiente[]): Simulacion {
   const sinVincular = new Map<string, Simulacion['sinVincular'][number]>()
   const conciliables: LineaPendiente[] = []
 
+  const descontar = (p: { id: number; nombre: string; stock: number }, unidades: number, kit?: string) => {
+    const imp = productos.get(p.id) ?? {
+      productoId: p.id,
+      nombre: p.nombre,
+      stockActual: p.stock,
+      aDescontar: 0,
+      stockResultante: p.stock,
+      viaKits: [],
+    }
+    imp.aDescontar += unidades
+    imp.stockResultante = imp.stockActual - imp.aDescontar
+    if (kit && !imp.viaKits.includes(kit)) imp.viaKits.push(kit)
+    productos.set(p.id, imp)
+  }
+
   for (const l of pendientes) {
     if (!l.producto) {
       const clave = l.mlItemId ?? `?${l.titulo}`
@@ -167,24 +297,13 @@ export function simular(pendientes: LineaPendiente[]): Simulacion {
       continue
     }
 
-    const p = productos.get(l.producto.id) ?? {
-      productoId: l.producto.id,
-      nombre: l.producto.nombre,
-      esKit: l.producto.es_kit,
-      stockActual: l.producto.stock,
-      aDescontar: 0,
-      stockResultante: l.producto.stock,
-      lineas: 0,
+    conciliables.push(l)
+    if (l.producto.es_kit) {
+      // Igual que descontar_stock_pedido: el kit no tiene stock propio.
+      for (const c of l.producto.componentes ?? []) descontar(c, c.cantidad * l.cantidad, l.producto.nombre)
+    } else {
+      descontar(l.producto, l.cantidad)
     }
-    p.lineas++
-    // Los kits no se concilian automáticamente (el RPC los rechaza): se
-    // muestran para que se vean, pero no suman al descuento.
-    if (!l.producto.es_kit) {
-      p.aDescontar += l.cantidad
-      p.stockResultante = p.stockActual - p.aDescontar
-      conciliables.push(l)
-    }
-    productos.set(l.producto.id, p)
   }
 
   return {
@@ -224,7 +343,7 @@ export async function aplicar(
     const r = data as { ok: boolean; motivo?: string; pedido_conciliado?: boolean } | null
     if (r?.ok) {
       resultado.aplicadas++
-      if (r.pedido_conciliado) resultado.pedidosConciliados++
+      if (r.pedido_conciliado && l.motivo === 'sin_vincular') resultado.pedidosConciliados++
     } else if (r?.motivo === 'ya_conciliado') {
       resultado.yaConciliadas++
     } else {

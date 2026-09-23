@@ -468,11 +468,10 @@ function TarjetaPublicaciones({ version, onCambio }: { version: number; onCambio
 interface ImpactoProducto {
   productoId: number
   nombre: string
-  esKit: boolean
   stockActual: number
   aDescontar: number
   stockResultante: number
-  lineas: number
+  viaKits: string[]
 }
 
 interface LineaPendiente {
@@ -482,6 +481,7 @@ interface LineaPendiente {
   fecha: string
   titulo: string
   cantidad: number
+  motivo: 'sin_vincular' | 'stock_insuficiente'
 }
 
 interface RespuestaConciliar {
@@ -523,6 +523,7 @@ function TarjetaConciliacion({ version, onAplicado }: { version: number; onAplic
   }, [version])
 
   const conciliables = res?.conciliables ?? []
+  const sinStock = conciliables.filter(l => l.motivo === 'stock_insuficiente').length
   const confirmar = () => {
     const unidades = conciliables.reduce((s, l) => s + l.cantidad, 0)
     if (window.confirm(`Se va a descontar stock de ${conciliables.length} línea(s) (${unidades} unidades). ¿Seguir?`)) {
@@ -534,8 +535,9 @@ function TarjetaConciliacion({ version, onAplicado }: { version: number; onAplic
     <div className="rounded-xl border border-gray-200 bg-surface p-5">
       <div className="text-[13px] font-medium text-gray-900">Descontar stock de ventas anteriores</div>
       <p className="text-[12px] text-gray-500 mt-0.5">
-        Ventas de ML que entraron antes de vincular su publicación y no descontaron stock.
-        Simulá para ver cuánto baja cada producto; si no alcanza, el stock queda negativo.
+        Ventas de ML que no descontaron stock: las que entraron antes de vincular su publicación
+        y las que no tenían stock suficiente al importarse. Simulá para ver cuánto baja cada
+        producto (los kits descuentan sus componentes); si no alcanza, el stock queda negativo.
       </p>
 
       <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -593,7 +595,9 @@ function TarjetaConciliacion({ version, onAplicado }: { version: number; onAplic
                         <tr key={p.productoId} className="border-t border-gray-50">
                           <td className="py-1.5 text-gray-800">
                             {p.nombre}
-                            {p.esKit && <span className="ml-1 text-[11px] text-amber-700">(kit: ajustar a mano)</span>}
+                            {p.viaKits.length > 0 && (
+                              <span className="ml-1 text-[11px] text-gray-400">(por kit: {p.viaKits.join(', ')})</span>
+                            )}
                           </td>
                           <td className="py-1.5 text-right text-gray-600">{p.stockActual}</td>
                           <td className="py-1.5 text-right text-red-600">{p.aDescontar ? `− ${p.aDescontar}` : '—'}</td>
@@ -604,6 +608,13 @@ function TarjetaConciliacion({ version, onAplicado }: { version: number; onAplic
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {sinStock > 0 && (
+                <div className="text-[12px] text-amber-700">
+                  {sinStock} venta(s) ya tenían producto pero no descontaron porque faltaba stock al importarse.
+                  Si ese stock ya lo ajustaste a mano, no apliques: se descontaría dos veces.
                 </div>
               )}
 
@@ -619,6 +630,9 @@ function TarjetaConciliacion({ version, onAplicado }: { version: number; onAplic
                       <span className="shrink-0">{new Date(l.fecha).toLocaleDateString('es-AR')}</span>
                       <span className="shrink-0">Pedido #{l.pedidoId}</span>
                       <span className="truncate flex-1">{l.titulo}</span>
+                      {l.motivo === 'stock_insuficiente' && (
+                        <span className="shrink-0 text-[11px] text-amber-700">sin stock al importar</span>
+                      )}
                       <span className="shrink-0">× {l.cantidad}</span>
                     </div>
                   ))}

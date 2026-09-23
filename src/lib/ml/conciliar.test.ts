@@ -19,6 +19,7 @@ function linea(cambios: Partial<LineaPendiente> = {}): LineaPendiente {
     mlItemId: 'MLA111',
     titulo: 'Lampara Oval Hongo 18cm',
     cantidad: 1,
+    motivo: 'sin_vincular',
     producto: lampara,
     ...cambios,
   }
@@ -32,7 +33,7 @@ describe('simular', () => {
     ])
 
     expect(sim.productos).toEqual([
-      { productoId: 7, nombre: 'Lámpara Hongo', esKit: false, stockActual: 3, aDescontar: 3, stockResultante: 0, lineas: 2 },
+      { productoId: 7, nombre: 'Lámpara Hongo', stockActual: 3, aDescontar: 3, stockResultante: 0, viaKits: [] },
     ])
     expect(sim.conciliables).toHaveLength(2)
   })
@@ -52,10 +53,27 @@ describe('simular', () => {
     expect(sim.sinVincular).toEqual([{ mlItemId: 'MLA999', titulo: 'Espejo', lineas: 2, unidades: 3 }])
   })
 
-  it('muestra los kits pero no los concilia', () => {
-    const sim = simular([linea({ producto: { ...lampara, es_kit: true } })])
-    expect(sim.conciliables).toHaveLength(0)
-    expect(sim.productos[0]).toMatchObject({ esKit: true, aDescontar: 0, stockResultante: 3 })
+  it('un kit descuenta sus componentes, no el kit', () => {
+    const kit = {
+      id: 50, nombre: 'Set living', stock: 0, es_kit: true,
+      componentes: [
+        { id: 7, nombre: 'Lámpara Hongo', stock: 3, cantidad: 2 },
+        { id: 8, nombre: 'Almohadón', stock: 10, cantidad: 1 },
+      ],
+    }
+    const sim = simular([linea({ producto: kit, cantidad: 2 }), linea({ itemId: 2, cantidad: 1 })])
+
+    expect(sim.conciliables).toHaveLength(2)
+    expect(sim.productos).toEqual([
+      { productoId: 8, nombre: 'Almohadón', stockActual: 10, aDescontar: 2, stockResultante: 8, viaKits: ['Set living'] },
+      { productoId: 7, nombre: 'Lámpara Hongo', stockActual: 3, aDescontar: 5, stockResultante: -2, viaKits: ['Set living'] },
+    ])
+  })
+
+  it('incluye las ventas que no descontaron por stock insuficiente', () => {
+    const sim = simular([linea({ motivo: 'stock_insuficiente', cantidad: 4 })])
+    expect(sim.conciliables).toHaveLength(1)
+    expect(sim.productos[0].stockResultante).toBe(-1)
   })
 })
 
