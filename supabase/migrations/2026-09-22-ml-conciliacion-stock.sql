@@ -34,22 +34,33 @@ CREATE INDEX IF NOT EXISTS items_pedido_ml_item_pendiente_idx
 -- La orden completa quedó guardada en ml_importaciones.payload. Se matchea la
 -- línea por título: nombre_producto se cargó con item.title tal cual.
 
+-- El match se arma en un CTE con su propio alias de items_pedido: dentro del
+-- FROM de un UPDATE (con JOIN LATERAL) Postgres no deja referenciar la tabla
+-- que se está actualizando.
+WITH origen AS (
+  SELECT DISTINCT ON (x.id)
+         x.id                  AS item_id,
+         li->'item'->>'id'     AS ml_item_id
+  FROM public.items_pedido x
+  JOIN public.pedidos p ON p.id = x.pedido_id
+  JOIN LATERAL (
+    SELECT mi.payload
+    FROM public.ml_importaciones mi
+    WHERE mi.ml_order_id = p.ml_order_id
+      AND mi.payload IS NOT NULL
+    ORDER BY mi.created_at DESC
+    LIMIT 1
+  ) imp ON true
+  CROSS JOIN LATERAL jsonb_array_elements(imp.payload->'order_items') li
+  WHERE p.ml_order_id IS NOT NULL
+    AND x.ml_item_id IS NULL
+    AND x.nombre_producto = li->'item'->>'title'
+  ORDER BY x.id
+)
 UPDATE public.items_pedido ip
-SET ml_item_id = li->'item'->>'id'
-FROM public.pedidos p
-JOIN LATERAL (
-  SELECT mi.payload
-  FROM public.ml_importaciones mi
-  WHERE mi.ml_order_id = p.ml_order_id
-    AND mi.payload IS NOT NULL
-  ORDER BY mi.created_at DESC
-  LIMIT 1
-) imp ON true
-CROSS JOIN LATERAL jsonb_array_elements(imp.payload->'order_items') li
-WHERE ip.pedido_id = p.id
-  AND p.ml_order_id IS NOT NULL
-  AND ip.ml_item_id IS NULL
-  AND ip.nombre_producto = li->'item'->>'title';
+SET ml_item_id = o.ml_item_id
+FROM origen o
+WHERE ip.id = o.item_id;
 
 
 -- ── PARTE C — RPC de conciliación de una línea ─────────────────────────────
