@@ -43,6 +43,9 @@ function PageInner() {
   const params = useSearchParams()
   const [estado, setEstado] = useState<EstadoML | null>(null)
   const [loading, setLoading] = useState(true)
+  // Cada tarjeta se recarga cuando la otra cambia algo que la afecta.
+  const [versionPublicaciones, setVersionPublicaciones] = useState(0)
+  const [versionConciliacion, setVersionConciliacion] = useState(0)
 
   // Resultado del retorno del OAuth (?estado=conectado|error)
   const oauthEstado = params.get('estado')
@@ -86,6 +89,11 @@ function PageInner() {
 
       {estado?.conectado && (
         <>
+          <TarjetaPublicaciones version={versionPublicaciones} onCambio={() => setVersionConciliacion(v => v + 1)} />
+          <TarjetaConciliacion
+            version={versionConciliacion}
+            onAplicado={() => { cargar(); setVersionPublicaciones(v => v + 1) }}
+          />
           <TarjetaBackfill onImportado={cargar} />
           <TarjetaImportaciones estado={estado} />
         </>
@@ -289,6 +297,345 @@ function Dato({ label, valor, rojo, teal }: { label: string; valor: number; rojo
       <div className={`font-medium ${rojo ? 'text-red-600' : teal ? 'text-teal-700' : 'text-gray-900'}`}>
         {rojo && valor > 0 ? '— ' : ''}{formatMonto(valor)}
       </div>
+    </div>
+  )
+}
+
+interface Publicacion {
+  ml_item_id: string
+  titulo: string
+  precio: number | null
+  stock_ml: number | null
+  thumbnail: string | null
+  permalink: string | null
+  activa: boolean
+  producto_id: number | null
+  unidades_pendientes: number
+}
+
+interface ProductoOpcion {
+  id: number
+  nombre: string
+  stock: number
+  es_kit: boolean
+}
+
+function TarjetaPublicaciones({ version, onCambio }: { version: number; onCambio: () => void }) {
+  const [publicaciones, setPublicaciones] = useState<Publicacion[]>([])
+  const [productos, setProductos] = useState<ProductoOpcion[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState<string | null>(null)
+  const [soloSinVincular, setSoloSinVincular] = useState(false)
+  const [filtro, setFiltro] = useState('')
+
+  const cargar = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const r = await fetch('/api/ml/publicaciones', { cache: 'no-store' })
+      const data = await r.json()
+      if (!data.ok) throw new Error(data.error)
+      setPublicaciones(data.publicaciones)
+      setProductos(data.productos)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al cargar publicaciones')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { cargar() }, [cargar, version])
+
+  const vincular = async (pub: Publicacion, productoId: number | null) => {
+    setGuardando(pub.ml_item_id)
+    setError('')
+    try {
+      const r = await fetch('/api/ml/publicaciones', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ml_item_id: pub.ml_item_id, producto_id: productoId, titulo: pub.titulo }),
+      })
+      const data = await r.json()
+      if (!data.ok) throw new Error(data.error)
+      setPublicaciones(ps => ps.map(p => p.ml_item_id === pub.ml_item_id ? { ...p, producto_id: productoId } : p))
+      onCambio()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar el vínculo')
+    } finally {
+      setGuardando(null)
+    }
+  }
+
+  const productoDe = new Map(productos.map(p => [p.id, p]))
+  const texto = filtro.trim().toLowerCase()
+  const visibles = publicaciones.filter(p =>
+    (!soloSinVincular || p.producto_id == null) &&
+    (!texto || p.titulo.toLowerCase().includes(texto) || p.ml_item_id.toLowerCase().includes(texto))
+  )
+  const sinVincular = publicaciones.filter(p => p.activa && p.producto_id == null).length
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-surface p-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-[13px] font-medium text-gray-900">Publicaciones y productos</div>
+          <p className="text-[12px] text-gray-500 mt-0.5">
+            Vinculá cada publicación con su producto para que las ventas de ML descuenten stock.
+            Varias publicaciones pueden apuntar al mismo producto.
+          </p>
+        </div>
+        {!loading && sinVincular > 0 && (
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium shrink-0">
+            {sinVincular} sin vincular
+          </span>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center gap-3 flex-wrap">
+        <input
+          type="search"
+          value={filtro}
+          onChange={e => setFiltro(e.target.value)}
+          placeholder="Buscar publicación…"
+          className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 focus:outline-none focus:border-teal-400 flex-1 min-w-[160px]"
+        />
+        <label className="flex items-center gap-1.5 text-[12px] text-gray-500">
+          <input type="checkbox" checked={soloSinVincular} onChange={e => setSoloSinVincular(e.target.checked)} />
+          Solo sin vincular
+        </label>
+      </div>
+
+      {error && <div className="mt-3 text-[12px] text-red-600">Error: {error}</div>}
+
+      <div className="mt-3 space-y-1">
+        {loading ? (
+          <div className="h-24 rounded-lg bg-gray-100 animate-pulse" />
+        ) : visibles.length === 0 ? (
+          <div className="text-[12px] text-gray-400 py-3">No hay publicaciones para mostrar.</div>
+        ) : visibles.map(pub => {
+          const producto = pub.producto_id != null ? productoDe.get(pub.producto_id) : undefined
+          return (
+            <div key={pub.ml_item_id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0 flex-wrap sm:flex-nowrap">
+              {pub.thumbnail ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={pub.thumbnail} alt="" className="w-10 h-10 rounded-md object-cover shrink-0 bg-gray-100" />
+              ) : (
+                <div className="w-10 h-10 rounded-md bg-gray-100 shrink-0" />
+              )}
+
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] text-gray-800 truncate">
+                  {pub.permalink ? (
+                    <a href={pub.permalink} target="_blank" rel="noreferrer" className="hover:underline">{pub.titulo}</a>
+                  ) : pub.titulo}
+                </div>
+                <div className="text-[11px] text-gray-400 flex gap-2 flex-wrap">
+                  <span>{pub.ml_item_id}</span>
+                  {pub.precio != null && <span>{formatMonto(pub.precio)}</span>}
+                  {pub.stock_ml != null && <span>Stock ML: {pub.stock_ml}</span>}
+                  {!pub.activa && <span className="text-gray-500">No activa</span>}
+                  {producto && <span className={producto.stock < 0 ? 'text-red-600' : 'text-teal-700'}>Stock interno: {producto.stock}</span>}
+                  {pub.unidades_pendientes > 0 && (
+                    <span className="text-amber-700">{pub.unidades_pendientes} u. vendidas sin descontar</span>
+                  )}
+                </div>
+              </div>
+
+              <select
+                value={pub.producto_id ?? ''}
+                disabled={guardando === pub.ml_item_id}
+                onChange={e => vincular(pub, e.target.value ? Number(e.target.value) : null)}
+                className={`text-[12px] border rounded-lg px-2 py-1.5 w-full sm:w-56 focus:outline-none focus:border-teal-400 disabled:opacity-50 ${
+                  pub.producto_id == null ? 'border-amber-300 text-gray-500' : 'border-gray-200 text-gray-700'
+                }`}
+              >
+                <option value="">Sin vincular</option>
+                {productos.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}{p.es_kit ? ' (kit)' : ''} · stock {p.stock}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+interface ImpactoProducto {
+  productoId: number
+  nombre: string
+  esKit: boolean
+  stockActual: number
+  aDescontar: number
+  stockResultante: number
+  lineas: number
+}
+
+interface LineaPendiente {
+  itemId: number
+  pedidoId: number
+  mlOrderId: string
+  fecha: string
+  titulo: string
+  cantidad: number
+}
+
+interface RespuestaConciliar {
+  ok: boolean
+  error?: string
+  simulacion?: boolean
+  productos?: ImpactoProducto[]
+  conciliables?: LineaPendiente[]
+  sinVincular?: { mlItemId: string | null; titulo: string; lineas: number; unidades: number }[]
+  resultado?: { aplicadas: number; yaConciliadas: number; errores: { itemId: number; motivo: string }[]; pedidosConciliados: number }
+}
+
+function TarjetaConciliacion({ version, onAplicado }: { version: number; onAplicado: () => void }) {
+  const [corriendo, setCorriendo] = useState(false)
+  const [res, setRes] = useState<RespuestaConciliar | null>(null)
+  const [verDetalle, setVerDetalle] = useState(false)
+
+  const correr = useCallback(async (dryRun: boolean) => {
+    setCorriendo(true)
+    try {
+      const r = await fetch('/api/ml/conciliar', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ dry_run: dryRun }),
+      })
+      const data: RespuestaConciliar = await r.json()
+      setRes(data)
+      if (!dryRun && data.ok) onAplicado()
+    } catch (e) {
+      setRes({ ok: false, error: e instanceof Error ? e.message : 'Error de red' })
+    } finally {
+      setCorriendo(false)
+    }
+  }, [onAplicado])
+
+  // Al cambiar un vínculo, una simulación ya mostrada queda vieja: se rehace.
+  useEffect(() => {
+    if (version > 0) setRes(prev => (prev?.simulacion ? null : prev))
+  }, [version])
+
+  const conciliables = res?.conciliables ?? []
+  const confirmar = () => {
+    const unidades = conciliables.reduce((s, l) => s + l.cantidad, 0)
+    if (window.confirm(`Se va a descontar stock de ${conciliables.length} línea(s) (${unidades} unidades). ¿Seguir?`)) {
+      correr(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-surface p-5">
+      <div className="text-[13px] font-medium text-gray-900">Descontar stock de ventas anteriores</div>
+      <p className="text-[12px] text-gray-500 mt-0.5">
+        Ventas de ML que entraron antes de vincular su publicación y no descontaron stock.
+        Simulá para ver cuánto baja cada producto; si no alcanza, el stock queda negativo.
+      </p>
+
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => correr(true)}
+          disabled={corriendo}
+          className="text-[12px] px-3 py-1.5 rounded-lg font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {corriendo ? 'Procesando…' : 'Simular'}
+        </button>
+        {res?.ok && res.simulacion && conciliables.length > 0 && (
+          <button
+            onClick={confirmar}
+            disabled={corriendo}
+            className="text-[12px] px-3 py-1.5 rounded-lg font-medium bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50"
+          >
+            Aplicar descuento
+          </button>
+        )}
+      </div>
+
+      {res && (
+        <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
+          {!res.ok ? (
+            <div className="text-[12px] text-red-600">Error: {res.error}</div>
+          ) : !res.simulacion && res.resultado ? (
+            <div className="text-[12px] text-gray-600 space-y-1">
+              <div>
+                ✓ Stock descontado en {res.resultado.aplicadas} línea(s) · {res.resultado.pedidosConciliados} pedido(s) conciliados
+                {res.resultado.yaConciliadas > 0 && ` · ${res.resultado.yaConciliadas} ya estaban hechas`}
+              </div>
+              {res.resultado.errores.length > 0 && (
+                <div className="text-red-600">
+                  {res.resultado.errores.length} fallaron: {res.resultado.errores.map(e => `#${e.itemId} (${e.motivo})`).join(', ')}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {(res.productos ?? []).length === 0 ? (
+                <div className="text-[12px] text-gray-500">No hay ventas pendientes de publicaciones vinculadas.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px]">
+                    <thead>
+                      <tr className="text-[11px] text-gray-400 uppercase tracking-wide text-left">
+                        <th className="font-normal py-1">Producto</th>
+                        <th className="font-normal py-1 text-right">Stock actual</th>
+                        <th className="font-normal py-1 text-right">A descontar</th>
+                        <th className="font-normal py-1 text-right">Queda</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {res.productos!.map(p => (
+                        <tr key={p.productoId} className="border-t border-gray-50">
+                          <td className="py-1.5 text-gray-800">
+                            {p.nombre}
+                            {p.esKit && <span className="ml-1 text-[11px] text-amber-700">(kit: ajustar a mano)</span>}
+                          </td>
+                          <td className="py-1.5 text-right text-gray-600">{p.stockActual}</td>
+                          <td className="py-1.5 text-right text-red-600">{p.aDescontar ? `− ${p.aDescontar}` : '—'}</td>
+                          <td className={`py-1.5 text-right font-medium ${p.stockResultante < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                            {p.stockResultante}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {conciliables.length > 0 && (
+                <button onClick={() => setVerDetalle(v => !v)} className="text-[12px] text-teal-700 hover:underline">
+                  {verDetalle ? 'Ocultar' : 'Ver'} las {conciliables.length} ventas
+                </button>
+              )}
+              {verDetalle && (
+                <div className="space-y-1">
+                  {conciliables.map(l => (
+                    <div key={l.itemId} className="flex gap-3 text-[12px] text-gray-500">
+                      <span className="shrink-0">{new Date(l.fecha).toLocaleDateString('es-AR')}</span>
+                      <span className="shrink-0">Pedido #{l.pedidoId}</span>
+                      <span className="truncate flex-1">{l.titulo}</span>
+                      <span className="shrink-0">× {l.cantidad}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(res.sinVincular ?? []).length > 0 && (
+                <div className="text-[12px] text-amber-700">
+                  Quedan afuera ventas de publicaciones sin vincular:{' '}
+                  {res.sinVincular!.map(s => `${s.titulo} (${s.unidades} u.)`).join(', ')}.
+                  Vinculalas arriba y volvé a simular.
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

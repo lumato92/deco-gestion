@@ -393,8 +393,18 @@ describe('mapeo orden → pedido', () => {
         precio_unitario: 30000,
         costo_unitario: 12000,
         requiere_fabricacion: false,
+        ml_item_id: 'MLA111',
       },
     ])
+  })
+
+  it('guarda la publicación de origen aunque no matchee, para conciliar después', async () => {
+    const { supabase, inserts } = fakeSupabase()
+
+    await importarOrden(supabase, orden())
+
+    const items = inserts.find(i => i.tabla === 'items_pedido')?.payload as Record<string, unknown>[]
+    expect(items[0]).toMatchObject({ producto_id: null, ml_item_id: 'MLA111' })
   })
 
   it('multiplica sale_fee por la cantidad (es por unidad, no por línea)', () => {

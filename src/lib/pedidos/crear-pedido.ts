@@ -21,6 +21,8 @@ export interface ItemPedidoNuevo {
   precio_unitario: number
   costo_unitario: number
   requiere_fabricacion: boolean
+  /** Solo en pedidos de ML: publicación de origen, para poder conciliar después. */
+  ml_item_id?: string
 }
 
 export interface PagoInicial {
@@ -121,6 +123,8 @@ export async function crearPedidoCompleto(
         precio_unitario: item.precio_unitario,
         costo_unitario: item.costo_unitario,
         requiere_fabricacion: item.requiere_fabricacion,
+        // Condicional por la misma razón que ml_order_id: la venta directa no cambia.
+        ...(item.ml_item_id !== undefined ? { ml_item_id: item.ml_item_id } : {}),
       }))
     )
 
