@@ -101,6 +101,19 @@ describe('crearPedidoCompleto — venta directa (regresión)', () => {
       { pedido_id: 900, producto_id: 1, nombre_producto: 'Cuadro', cantidad: 3, precio_unitario: 10000, costo_unitario: 4000, requiere_fabricacion: true },
       { pedido_id: 900, producto_id: null, nombre_producto: 'Envío', cantidad: 1, precio_unitario: 5000, costo_unitario: 0, requiere_fabricacion: false },
     ])
+    expect(insertDe<Record<string, unknown>[]>(registro, 'items_pedido')[0]).not.toHaveProperty('ml_item_id')
+  })
+
+  it('manda ml_item_id en el item solo cuando viene de ML', async () => {
+    const { supabase, registro } = crearFakeSupabase({ pedidoId: 900 })
+
+    await crearPedidoCompleto(supabase, venta({
+      items: [
+        { producto_id: null, nombre_producto: 'Lámpara', cantidad: 1, precio_unitario: 55000, costo_unitario: 0, requiere_fabricacion: false, ml_item_id: 'MLA123' },
+      ],
+    }))
+
+    expect(insertDe<Record<string, unknown>[]>(registro, 'items_pedido')[0]).toMatchObject({ ml_item_id: 'MLA123' })
   })
 
   it('registra la seña como pago parcial', async () => {

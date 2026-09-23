@@ -218,6 +218,9 @@ export async function importarOrden(
       precio_unitario: linea.unit_price,
       costo_unitario: producto?.costo ?? 0,
       requiere_fabricacion: false,
+      // Se guarda siempre, con o sin match: si la publicación se vincula más
+      // tarde, la conciliación sabe de qué publicación vino esta línea.
+      ml_item_id: linea.item.id,
     }
   })
 

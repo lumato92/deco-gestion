@@ -123,6 +123,30 @@ export interface CostosEnvioML {
   receiver?: ParteEnvioML | null
 }
 
+/** Publicación, tal como la devuelve el multiget de /items con `attributes`. */
+export interface PublicacionML {
+  id: string
+  title: string
+  price: number
+  /** Stock que ML tiene cargado en la publicación (no el nuestro). */
+  available_quantity: number
+  status: string
+  thumbnail?: string | null
+  permalink?: string | null
+}
+
+/** Respuesta de /users/{id}/items/search: solo ids, paginados. */
+export interface BusquedaItemsML {
+  results?: string[]
+  paging?: { total?: number; offset?: number; limit?: number }
+}
+
+/** Cada entrada del multiget GET /items?ids=... */
+export interface MultigetItemML {
+  code: number
+  body: PublicacionML
+}
+
 /** Respuesta del POST /oauth/token (authorization_code y refresh_token). */
 export interface TokenML {
   access_token: string
